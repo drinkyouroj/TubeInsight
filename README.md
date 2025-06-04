@@ -16,32 +16,39 @@ TubeInsight is a web application designed to help YouTube content creators analy
 
 **Tech Stack:**
 
-* **Frontend:** To be determined (e.g., React, Vue, Angular, Svelte) - will present a data-rich dashboard.
-* **Backend:** To be determined (e.g., Node.js/Express, Python/Flask/Django) - will handle API logic, external service integration, and database interaction.
+* **Frontend:** **React with Next.js** - will present a data-rich dashboard.
+* **Backend:** **Python with Flask** - will handle API logic, external service integration, and database interaction.
 * **Database:** Supabase (PostgreSQL) for user authentication, storing video details, cached comments, and analysis results.
 * **AI:** OpenAI API (using model `gpt-4.1`) for sentiment classification and summarization.
 * **Data Source:** YouTube Data API v3 for fetching video comments and details.
 
 **High-Level Setup & Installation (Conceptual):**
 
-Detailed setup instructions will depend on the specific frontend and backend frameworks chosen. However, the general steps would involve:
+Detailed setup instructions will depend on the specific project structure. However, the general steps would involve:
 
 1.  **Clone the repository:** `git clone <repository-url>`
-2.  **Backend Setup:**
+2.  **Backend Setup (Python/Flask):**
     * Navigate to the `backend` directory.
-    * Install dependencies (e.g., `npm install` or `pip install -r requirements.txt`).
-    * Set up environment variables for:
-        * Supabase URL and Service Key
-        * OpenAI API Key
-        * YouTube Data API Key
-    * Run database migrations (if managed by the backend/Supabase CLI).
-    * Start the backend server.
-3.  **Frontend Setup:**
+    * Create and activate a virtual environment (e.g., `python -m venv venv`, `source venv/bin/activate`).
+    * Install dependencies: `pip install -r requirements.txt`.
+    * Set up environment variables (e.g., in a `.env` file loaded by Flask-DotEnv or similar):
+        * `SUPABASE_URL`
+        * `SUPABASE_SERVICE_KEY` (or ANON_KEY depending on usage)
+        * `OPENAI_API_KEY`
+        * `YOUTUBE_API_KEY`
+        * `FLASK_APP` (e.g., `app.py`)
+        * `FLASK_ENV` (e.g., `development`)
+    * Run database migrations (if managed separately or via Supabase CLI).
+    * Start the Flask development server: `flask run`.
+3.  **Frontend Setup (React/Next.js):**
     * Navigate to the `frontend` directory.
-    * Install dependencies (e.g., `npm install`).
-    * Configure the frontend to connect to the backend API endpoint.
-    * Start the frontend development server.
-4.  **Access the application:** Open the provided URL (e.g., `http://localhost:3000`) in your browser.
+    * Install dependencies: `npm install` (or `yarn install`).
+    * Set up environment variables (e.g., in `.env.local`):
+        * `NEXT_PUBLIC_SUPABASE_URL`
+        * `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+        * `NEXT_PUBLIC_BACKEND_API_URL` (e.g., `http://localhost:5000/api`)
+    * Start the Next.js development server: `npm run dev` (or `yarn dev`).
+4.  **Access the application:** Open the provided URL (e.g., `http://localhost:3000` for Next.js frontend) in your browser.
 
 **Usage:**
 
