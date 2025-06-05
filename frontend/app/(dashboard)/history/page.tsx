@@ -9,128 +9,126 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/Card';
-import { History as HistoryIcon, ListChecks } from 'lucide-react'; // Using an alias for History icon
+import { History as HistoryIcon, ListChecks, AlertTriangle, Youtube } from 'lucide-react'; // Added Youtube icon
 import type { Metadata } from 'next';
-// import AnalysisHistoryList from '@/components/history/AnalysisHistoryList'; // We'll create this later
+import AnalysisHistoryList from '@/components/history/AnalysisHistoryList';
+import { fetchAnalysisHistory, type AnalysisHistoryItem } from '@/lib/api'; // Import the API function and type
+import { Button } from '@/components/ui/Button';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Analysis History',
   description: 'Review your past YouTube video sentiment analyses on TubeInsight.',
 };
 
-// Define a type for the analysis items, which you'd fetch from your database
-// This should align with the data structure returned by your backend or Supabase query
-export interface AnalysisHistoryItemData {
-  analysisId: string;
-  videoId: string; // The original YouTube video ID
-  videoTitle?: string; // Fetched from the 'videos' table or during analysis
-  analysisTimestamp: string; // ISO string
-  totalCommentsAnalyzed: number;
-}
-
+// The AnalysisHistoryItemData type used by AnalysisHistoryList component
+// should align with the AnalysisHistoryItem type from api.ts.
+// For clarity, let's use the imported type or ensure they are compatible.
+// In AnalysisHistoryList.tsx, we defined AnalysisHistoryItemData, which should now
+// directly match the 'AnalysisHistoryItem' type from lib/api.ts.
+// Let's assume AnalysisHistoryListProps in AnalysisHistoryList.tsx uses:
+// interface AnalysisHistoryListProps {
+//   analyses: AnalysisHistoryItem[]; // Using the imported type
+//   isLoading?: boolean; // isLoading for the list itself, if parent fetches
+// }
 
 export default async function HistoryPage() {
+  // Although middleware handles primary auth, a check in Server Components is good practice.
   const supabase = createSupabaseServerClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   if (!session) {
+    // Middleware should ideally redirect before this page component even runs.
     redirect('/login?next=/history');
   }
 
-  // Placeholder: Fetch analysis history for the user from Supabase
-  // This query would join 'analyses' with 'videos' to get the video title.
-  // const { data: analyses, error } = await supabase
-  //   .from('analyses')
-  //   .select(`
-  //     analysis_id,
-  //     youtube_video_id,
-  //     analysis_timestamp,
-  //     total_comments_analyzed,
-  //     videos ( video_title )
-  //   `)
-  //   .eq('user_id', session.user.id)
-  //   .order('analysis_timestamp', { ascending: false });
+  let analyses: AnalysisHistoryItem[] = [];
+  let fetchError: string | null = null;
+  // For Server Components, data fetching is done before rendering,
+  // so a distinct 'isLoading' prop for the page itself isn't managed the same way
+  // as client-side fetching. If fetchAnalysisHistory() is slow, the page will wait.
+  // The <AnalysisHistoryList isLoading={...}> prop is for its internal display if needed.
 
-  // if (error) {
-  //   console.error('Error fetching analysis history:', error);
-  //   // Handle error appropriately, e.g., show an error message
-  // }
-
-  // For now, use placeholder data or an empty array
-  const placeholderAnalyses: AnalysisHistoryItemData[] = [
-    // {
-    //   analysisId: 'uuid-placeholder-1',
-    //   videoId: 'dQw4w9WgXcQ',
-    //   videoTitle: 'Never Gonna Give You Up - Placeholder',
-    //   analysisTimestamp: new Date().toISOString(),
-    //   totalCommentsAnalyzed: 100,
-    // },
-    // {
-    //   analysisId: 'uuid-placeholder-2',
-    //   videoId: 'anotherVideoId',
-    //   videoTitle: 'Another Awesome Video - Placeholder',
-    //   analysisTimestamp: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-    //   totalCommentsAnalyzed: 95,
-    // },
-  ];
-
+  try {
+    // Fetch analysis history using the API service function.
+    // This function handles including the auth token.
+    const historyData = await fetchAnalysisHistory(); // This is an async call
+    analyses = historyData.analyses || [];
+  } catch (error) {
+    console.error('Error fetching analysis history on page:', error);
+    fetchError = error instanceof Error ? error.message : 'Failed to load analysis history.';
+    analyses = []; // Ensure analyses is an empty array on error for the list component
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center space-x-3">
           <HistoryIcon className="h-8 w-8 text-primary" />
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
             Analysis History
           </h1>
         </div>
-        {/* Optionally, a button to "Analyze New Video" could go here */}
-        {/* <Link href="/analyze" legacyBehavior passHref><Button>Analyze New Video</Button></Link> */}
+        <Link href="/analyze" legacyBehavior passHref>
+          <Button size="sm">
+            <Youtube className="mr-2 h-4 w-4" />
+            Analyze New Video
+          </Button>
+        </Link>
       </div>
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <div className="flex items-center space-x-2">
-            <ListChecks className="h-6 w-6 text-muted-foreground" />
-            <CardTitle>Your Past Analyses</CardTitle>
-          </div>
-          <CardDescription>
-            Review and revisit insights from your previously analyzed videos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/*
-            The AnalysisHistoryList component will render the list of analyses.
-            For now, we'll put a placeholder.
-          */}
-          {placeholderAnalyses.length > 0 ? (
-             <div className="rounded-md border border-dashed border-border bg-background/50 p-8 text-center">
-                <p className="text-sm text-muted-foreground">
-                    Analysis history list component will be implemented here to display your saved analyses.
-                </p>
-             </div>
-            // <AnalysisHistoryList analyses={analyses || placeholderAnalyses} />
-          ) : (
-            <div className="rounded-md border border-dashed border-border bg-background/50 p-8 text-center">
-              <HistoryIcon className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
-              <h3 className="text-lg font-medium text-foreground">
-                No Analyses Yet
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                You haven&apos;t analyzed any videos. Start by analyzing a new
-                video to see your history here.
-              </p>
-              {/*
-              <Link href="/analyze" className="mt-4 inline-flex">
-                <Button>Analyze Your First Video</Button>
-              </Link>
-              */}
+      {/* Display error message if fetching failed */}
+      {fetchError && (
+        <Card className="border-destructive bg-destructive/10 text-destructive dark:border-destructive/50 dark:bg-destructive/20">
+          <CardHeader>
+            <CardTitle className="flex items-center text-base font-semibold sm:text-lg">
+              <AlertTriangle className="mr-2 h-5 w-5" />
+              Could Not Load History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">{fetchError}</p>
+            <p className="mt-2 text-xs">
+              Please try refreshing the page. If the problem persists, the backend service might be unavailable.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Render AnalysisHistoryList only if there was no initial fetch error */}
+      {/* The AnalysisHistoryList component itself will handle the "no analyses yet" case */}
+      {!fetchError && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                    <ListChecks className="h-6 w-6 text-muted-foreground" />
+                    <CardTitle className="text-lg sm:text-xl">Your Past Analyses</CardTitle>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                    {analyses.length} {analyses.length === 1 ? 'Result' : 'Results'}
+                </span>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <CardDescription className="mt-1 text-sm">
+              Review and revisit insights from your previously analyzed videos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 sm:p-0"> {/* Remove default padding if list items have their own */}
+            {/*
+              isLoading prop for AnalysisHistoryList:
+              Since this page is a Server Component, the data fetching for `analyses`
+              completes before the page is rendered. So, the main `isLoading` state
+              for the page's data is handled by Next.js during the server render.
+              The `AnalysisHistoryList` might have its own internal loading states if it were
+              to perform further client-side operations (like pagination, which we aren't doing yet).
+              For now, we can pass isLoading as false as the data is pre-fetched.
+            */}
+            <AnalysisHistoryList analyses={analyses} isLoading={false} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
