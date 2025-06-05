@@ -1,0 +1,23 @@
+# Flask and related essentials
+Flask>=2.0.0,<3.1.0
+python-dotenv>=0.19.0,<1.1.0
+Flask-CORS>=3.0.0,<4.1.0
+
+# Supabase client for Python
+supabase-py>=2.0.0,<3.0.0
+
+# OpenAI API client
+openai>=1.0.0,<2.0.0
+
+# Google API Client for YouTube Data API
+google-api-python-client>=2.0.0,<3.0.0
+google-auth>=2.0.0,<3.0.0
+google-auth-httplib2>=0.1.0,<0.2.0
+
+# For JWT handling
+PyJWT>=2.0.0,<3.0.0
+
+# Optional: Pydantic for data validation
+pydantic>=2.0.0,<3.0.0
+# Optional: Gunicorn for production
+gunicorn>=20.0.0,<22.0.0
