@@ -37,6 +37,12 @@
   --ring: 222.2 84% 4.9%;
   
   --radius: 0.5rem; /* Default border radius */
+
+  --chart-green: 130 50% 50%;    /* HSL: hue, saturation, lightness */
+  --chart-gray: 220 10% 65%;
+  --chart-blue: 210 70% 55%;
+  --chart-red: 0 70% 55%;
+  --chart-orange: 30 80% 55%;
 }
 
 [data-theme="dark"] {
@@ -67,6 +73,12 @@
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
   --ring: 215 20.2% 65.1%;
+
+  --chart-green: 130 50% 40%;
+  --chart-gray: 220 10% 45%;
+  --chart-blue: 210 70% 45%;
+  --chart-red: 0 70% 45%;
+  --chart-orange: 30 80% 45%;
 }
 
 /* Apply a default font and antialiasing for better text rendering */
