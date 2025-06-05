@@ -5,31 +5,23 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { AlertCircle, Loader2, Send } from 'lucide-react'; // Icons
+import { AlertCircle, Loader2, Send, YoutubeIcon } from 'lucide-react'; // Icons
 import { useSupabase } from '@/contexts/SupabaseProvider'; // To get Supabase client for token
 
 // Define the expected structure of the API response from your Flask backend
-interface AnalysisResponse {
+// This should match the response designed for `POST /api/analyze-video`
+interface AnalysisApiResponse {
   analysisId: string;
   videoId: string;
   videoTitle: string;
-  analysisTimestamp: string;
-  totalCommentsAnalyzed: number;
-  sentimentBreakdown: Array<{
-    category: string;
-    count: number;
-    summary: string;
-  }>;
-  commentsByDate: Array<{
-    date: string;
-    count: number;
-  }>;
+  // ... other fields returned by your backend upon successful analysis
 }
 
 export default function VideoUrlInputForm() {
   const [videoUrl, setVideoUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const router = useRouter();
   const supabase = useSupabase(); // Get Supabase client from context
 
@@ -37,6 +29,7 @@ export default function VideoUrlInputForm() {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     if (!videoUrl.trim()) {
       setError('Please enter a YouTube video URL.');
@@ -44,29 +37,37 @@ export default function VideoUrlInputForm() {
       return;
     }
 
-    // Validate YouTube URL (basic client-side check)
-    // A more robust validation might be needed on the backend
-    const youtubeUrlPattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]{11}(&\S*)?$/;
+    // Basic client-side validation for YouTube URL format
+    const youtubeUrlPattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]{11}([\?&].*)?$/;
     if (!youtubeUrlPattern.test(videoUrl)) {
-      setError('Invalid YouTube video URL format. Please use a full video URL (e.g., https://www.youtube.com/watch?v=...).');
+      setError(
+        'Invalid YouTube video URL. Please use a full video URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID).'
+      );
       setIsLoading(false);
       return;
     }
 
     try {
-      // Get the session and access token from Supabase
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setError('You are not authenticated. Please log in.');
+        setError('Authentication required. Please log in to analyze videos.');
         setIsLoading(false);
-        // Optionally redirect to login
-        // router.push('/login?next=/analyze');
+        // Optionally redirect to login, preserving the current URL or a specific return path
+        // router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
         return;
       }
       const accessToken = session.access_token;
 
+      // Construct the backend API URL from environment variables
+      const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+      if (!backendApiUrl) {
+        setError('Backend API URL is not configured. Please contact support.');
+        setIsLoading(false);
+        return;
+      }
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analyze-video`,
+        `${backendApiUrl}/analyze-video`, // Ensure this matches your Flask API endpoint
         {
           method: 'POST',
           headers: {
@@ -78,65 +79,95 @@ export default function VideoUrlInputForm() {
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to analyze video. Please try again.' }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          // If response is not JSON or empty
+          errorData = { message: `HTTP error ${response.status}. Please try again.` };
+        }
+        throw new Error(errorData.message || `Failed to analyze video. Status: ${response.status}`);
       }
 
-      const result: AnalysisResponse = await response.json();
-
+      const result: AnalysisApiResponse = await response.json();
+      setSuccessMessage(`Analysis started for "${result.videoTitle || result.videoId}". Redirecting to results...`);
+      
       // On successful analysis, redirect to the specific analysis page
-      // or update the UI in place if preferred.
-      // For this example, we'll redirect to a dynamic page showing the results.
-      // You'll need to create this page: app/(dashboard)/analysis/[analysisId]/page.tsx
       router.push(`/analysis/${result.analysisId}`);
-      // router.refresh(); // Might be needed if you don't redirect and update current page state
+      // No need to call router.refresh() here as navigation will trigger a fresh load
+      // of the new page, which is a Server Component and will fetch its own data.
 
     } catch (err) {
       console.error('Analysis submission error:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred during analysis.';
+      // Check for common user-facing errors
+      if (errorMessage.includes("Quota exceeded") || errorMessage.includes("API key invalid")) {
+         setError("There was an issue with the analysis service. Please try again later or contact support.");
+      } else {
+         setError(errorMessage);
+      }
     } finally {
-      setIsLoading(false);
+      // Don't set isLoading to false immediately if redirecting,
+      // but if there's an error, we should.
+      if (error || (!isLoading && !successMessage) ) { // only stop loading if error or not successful
+        setIsLoading(false);
+      }
+      // Clear URL input only on success, or keep it for correction if error
+      // if (successMessage) setVideoUrl('');
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="videoUrl" className="sr-only">
-          YouTube Video URL
-        </label>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="relative">
+        <YoutubeIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input
           id="videoUrl"
+          name="videoUrl"
           type="url"
           value={videoUrl}
-          onChange={(e) => setVideoUrl(e.target.value)}
+          onChange={(e) => {
+            setVideoUrl(e.target.value);
+            if (error) setError(null); // Clear error when user types
+          }}
           placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ"
           disabled={isLoading}
           required
-          className="text-sm sm:text-base"
+          aria-label="YouTube Video URL"
+          className="pl-10 text-sm sm:text-base" // Add padding for the icon
         />
       </div>
 
       {error && (
         <div
           role="alert"
-          className="flex items-center space-x-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
+          className="flex items-start space-x-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive dark:border-destructive/50 dark:bg-destructive/20"
         >
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
           <p>{error}</p>
+        </div>
+      )}
+
+      {successMessage && !error && ( // Show success message only if no error
+        <div
+          role="status"
+          className="flex items-center space-x-2 rounded-md border border-green-500/50 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-400"
+        >
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {/* Show loader while redirecting */}
+          <p>{successMessage}</p>
         </div>
       )}
 
       <Button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || !!successMessage} // Disable button also on success message shown (during redirect)
         className="w-full text-base"
         size="lg"
       >
-        {isLoading ? (
+        {isLoading || successMessage ? ( // Show loader if loading or on success (redirecting)
           <>
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            Analyzing...
+            {successMessage ? 'Redirecting...' : 'Analyzing...'}
           </>
         ) : (
           <>
