@@ -11,7 +11,8 @@ try:
 except ImportError:
     # Fallback if the path changes in future versions or for simplicity during issues
     SupabaseUser = type('SupabaseUser', (object,), {'id': str}) # Basic mock for type hint
-    current_app.logger.warning("Could not import SupabaseUser from supabase.lib.auth.user. Using a mock type hint.")
+    # Use print here as current_app.logger is not available at module import time
+    print("WARNING: Could not import SupabaseUser from supabase.lib.auth.user. Using a mock type hint for SupabaseUser.")
 
 from datetime import datetime, timezone # For timestamps if needed directly in routes
 
