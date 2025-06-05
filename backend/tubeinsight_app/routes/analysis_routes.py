@@ -1,17 +1,16 @@
 # File: backend/tubeinsight_app/routes/analysis_routes.py
 
 from flask import Blueprint, request, jsonify, current_app
-# Import the recommended authentication decorator
 from ..utils.auth_utils import supabase_user_from_token_required
-# We'll import actual service functions later
-# from ..services.sentiment_service import process_video_analysis
-# from ..services.supabase_service import get_user_analyses_history, get_analysis_detail_by_id
+# Import service functions
+from ..services import sentiment_service, supabase_service, youtube_service # Ensure youtube_service is also available if needed directly, though sentiment_service uses it
 from supabase import User as SupabaseUser # For type hinting the injected user
+from datetime import datetime, timezone # For timestamps if needed directly in routes
 
 analysis_bp = Blueprint('analysis_bp', __name__, url_prefix='/api')
 
 @analysis_bp.route('/analyze-video', methods=['POST'])
-@supabase_user_from_token_required # Apply the decorator
+@supabase_user_from_token_required
 def analyze_video(current_supabase_user: SupabaseUser, **kwargs):
     """
     Endpoint to analyze a new YouTube video.
@@ -30,42 +29,27 @@ def analyze_video(current_supabase_user: SupabaseUser, **kwargs):
     
     current_app.logger.info(f"User '{user_id}': Received request to analyze video URL: {video_url}")
     
-    # Placeholder for actual analysis logic using sentiment_service.py
-    # analysis_result = process_video_analysis(video_url, user_id)
-    # if "error" in analysis_result:
-    #    return jsonify(analysis_result), analysis_result.get("status_code", 500)
-    # return jsonify(analysis_result), 200
-
-    # --- Placeholder Response ---
-    mock_analysis_id = "auth-mock-analysis-uuid-12345"
-    mock_video_title = f"Authenticated Analysis for {video_url}"
-    
-    mock_comments_by_date = [
-        { "date": "2025-06-01", "count": 10 },
-        { "date": "2025-06-02", "count": 25 },
-    ]
-
-    mock_response = {
-      "analysisId": mock_analysis_id,
-      "videoId": "extractedVideoIdFromUrl", # You'd extract this
-      "videoTitle": mock_video_title,
-      "analysisTimestamp": "2025-06-05T14:00:00Z", 
-      "totalCommentsAnalyzed": 100,
-      "sentimentBreakdown": [
-        { "category": "Positive", "count": 55, "summary": "User-specific positive feedback." },
-        { "category": "Neutral", "count": 20, "summary": "User-specific neutral observations." },
-        { "category": "Critical", "count": 15, "summary": "User-specific critical points." },
-        { "category": "Toxic", "count": 10, "summary": "User-specific toxic summary." }
-      ],
-      "commentsByDate": mock_comments_by_date
-    }
-    # --- End Placeholder Response ---
-
-    return jsonify(mock_response), 200
+    # Call the sentiment_service to process the analysis
+    try:
+        analysis_result = sentiment_service.process_video_analysis(video_url, user_id)
+        
+        if "error" in analysis_result:
+            # The service function returns a dict with 'error' and 'status_code'
+            status_code = analysis_result.get("status_code", 500)
+            current_app.logger.error(f"Analysis failed for user '{user_id}', video '{video_url}': {analysis_result['error']} (HTTP {status_code})")
+            return jsonify({"error": analysis_result["error"]}), status_code
+        
+        # If successful, the service function returns the full response payload
+        current_app.logger.info(f"Analysis successful for user '{user_id}', video '{video_url}'. Analysis ID: {analysis_result.get('analysisId')}")
+        return jsonify(analysis_result), 200
+        
+    except Exception as e:
+        current_app.logger.exception(f"Unexpected error during video analysis for user '{user_id}', video '{video_url}': {e}")
+        return jsonify({"error": "An unexpected server error occurred."}), 500
 
 
 @analysis_bp.route('/analyses', methods=['GET'])
-@supabase_user_from_token_required # Apply the decorator
+@supabase_user_from_token_required
 def get_analyses_history(current_supabase_user: SupabaseUser, **kwargs):
     """
     Endpoint to fetch the analysis history for the authenticated user.
@@ -74,35 +58,25 @@ def get_analyses_history(current_supabase_user: SupabaseUser, **kwargs):
     user_id = current_supabase_user.id
     current_app.logger.info(f"User '{user_id}' requesting analysis history.")
 
-    # Placeholder for actual history fetching logic using supabase_service.py
-    # analyses = get_user_analyses_history(user_id)
-    # if "error" in analyses:
-    #    return jsonify(analyses), analyses.get("status_code", 500)
-    # return jsonify({"analyses": analyses}), 200
-    
-    # --- Placeholder Response ---
-    mock_history = [
-        {
-          "analysisId": "auth-mock-analysis-uuid-12345",
-          "videoId": "mockVideoId1",
-          "videoTitle": f"User {user_id}'s First Video",
-          "analysisTimestamp": "2025-06-05T14:00:00Z",
-          "totalCommentsAnalyzed": 100
-        },
-        {
-          "analysisId": "auth-mock-analysis-uuid-67890",
-          "videoId": "mockVideoId2",
-          "videoTitle": f"User {user_id}'s Second Video",
-          "analysisTimestamp": "2025-06-04T10:00:00Z",
-          "totalCommentsAnalyzed": 100
-        }
-    ]
-    # --- End Placeholder Response ---
-    return jsonify({"analyses": mock_history}), 200
+    try:
+        # Call supabase_service to get history
+        # The service function should return a list of analyses or None/error dict
+        history_data = supabase_service.get_user_analyses_history(user_id)
+
+        if history_data is None: # Indicates an error from the service
+            current_app.logger.error(f"Failed to fetch analysis history for user '{user_id}'.")
+            return jsonify({"error": "Could not retrieve analysis history."}), 500
+        
+        # The service returns a list, even if empty.
+        return jsonify({"analyses": history_data}), 200
+
+    except Exception as e:
+        current_app.logger.exception(f"Unexpected error fetching analysis history for user '{user_id}': {e}")
+        return jsonify({"error": "An unexpected server error occurred."}), 500
 
 
-@analysis_bp.route('/analyses/<string:analysis_id_from_path>', methods=['GET']) # Renamed path variable
-@supabase_user_from_token_required # Apply the decorator
+@analysis_bp.route('/analyses/<string:analysis_id_from_path>', methods=['GET'])
+@supabase_user_from_token_required
 def get_analysis_details(current_supabase_user: SupabaseUser, analysis_id_from_path: str, **kwargs):
     """
     Endpoint to fetch the details of a specific analysis run.
@@ -113,39 +87,42 @@ def get_analysis_details(current_supabase_user: SupabaseUser, analysis_id_from_p
     user_id = current_supabase_user.id
     current_app.logger.info(f"User '{user_id}' requesting details for analysis ID: {analysis_id_from_path}.")
 
-    # Placeholder for actual detail fetching logic using supabase_service.py
-    # This service function would also check if user_id matches the owner of analysis_id_from_path
-    # analysis_details = get_analysis_detail_by_id(analysis_id_from_path, user_id)
-    # if not analysis_details: # This implies either not found or not owned by user
-    #    current_app.logger.warning(f"User '{user_id}' failed to retrieve analysis '{analysis_id_from_path}': Not found or access denied.")
-    #    return jsonify({"error": "Analysis not found or access denied"}), 404
-    # if "error" in analysis_details: # If service layer returns an error object
-    #    return jsonify(analysis_details), analysis_details.get("status_code", 500)
-    # return jsonify(analysis_details), 200
+    try:
+        # Call supabase_service to get analysis details
+        # The service function handles checking user ownership.
+        analysis_details = supabase_service.get_analysis_detail_by_id(analysis_id_from_path, user_id)
 
-    # --- Placeholder Response ---
-    if analysis_id_from_path == "auth-mock-analysis-uuid-12345": # Simulate finding one
-        mock_response = {
-          "analysisId": analysis_id_from_path,
-          "videoId": "mockVideoId1",
-          "videoTitle": f"Details for User {user_id}'s First Video",
-          "analysisTimestamp": "2025-06-05T14:00:00Z",
-          "totalCommentsAnalyzed": 100,
-          "sentimentBreakdown": [
-            { "category": "Positive", "count": 65, "summary": "Very positive for this user." },
-            { "category": "Neutral", "count": 10, "summary": "Few neutral." },
-            { "category": "Critical", "count": 15, "summary": "Some critiques." },
-            { "category": "Toxic", "count": 10, "summary": "Low toxicity." }
-          ],
-          "commentsByDate": [ { "date": "2025-06-01", "count": 60 }, { "date": "2025-06-02", "count": 40 } ]
-        }
-        return jsonify(mock_response), 200
-    else:
-        current_app.logger.warning(f"User '{user_id}' requested analysis '{analysis_id_from_path}' which was not found (mock).")
-        return jsonify({"error": "Analysis not found (mock response)"}), 404
-    # --- End Placeholder Response ---
+        if analysis_details is None:
+            current_app.logger.warning(f"Analysis '{analysis_id_from_path}' not found or access denied for user '{user_id}'.")
+            return jsonify({"error": "Analysis not found or access denied"}), 404
+        
+        # If the service function returns an error dictionary (though get_analysis_detail_by_id currently returns None on error/not found)
+        # if isinstance(analysis_details, dict) and "error" in analysis_details:
+        #     status_code = analysis_details.get("status_code", 500)
+        #     return jsonify({"error": analysis_details["error"]}), status_code
 
-# Remember to register this blueprint in tubeinsight_app/__init__.py:
-# from .routes.analysis_routes import analysis_bp
-# app.register_blueprint(analysis_bp)
-# (This should already be done based on previous steps)
+        # --- Prepare commentsByDate for the response ---
+        # This was part of the original response design for POST /analyze-video
+        # and should also be included when fetching a specific analysis.
+        # The `get_analysis_detail_by_id` currently fetches video info and category summaries.
+        # It doesn't fetch `commentsByDate`. We need to add that.
+        
+        # For now, let's assume `analysis_details` contains `youtube_video_id`
+        youtube_video_id_for_comments = analysis_details.get('youtube_video_id')
+        comments_by_date_data = []
+        if youtube_video_id_for_comments:
+            comments_by_date_data = supabase_service.get_comments_by_date_for_video(youtube_video_id_for_comments)
+            if comments_by_date_data is None: # Error fetching
+                comments_by_date_data = [] 
+                current_app.logger.warning(f"Could not fetch comments_by_date for video_id {youtube_video_id_for_comments} for analysis {analysis_id_from_path}, returning empty list.")
+        
+        # Add commentsByDate to the response, similar to the /analyze-video response structure
+        response_payload = {**analysis_details, "commentsByDate": comments_by_date_data}
+        
+        current_app.logger.info(f"Successfully retrieved details for analysis '{analysis_id_from_path}' for user '{user_id}'.")
+        return jsonify(response_payload), 200
+
+    except Exception as e:
+        current_app.logger.exception(f"Unexpected error fetching analysis details for user '{user_id}', analysis '{analysis_id_from_path}': {e}")
+        return jsonify({"error": "An unexpected server error occurred."}), 500
+
