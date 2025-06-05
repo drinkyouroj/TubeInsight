@@ -80,19 +80,16 @@ def create_app(config_name=None):
 
     # --- Logging Setup ---
     log_level = logging.DEBUG if app.debug else logging.INFO
-    if app.testing: # Quieter logging for tests unless explicitly verbose
+    if app.testing: 
         log_level = logging.WARNING 
     
-    # BasicConfig should only be called once. Flask's default logger is usually fine for dev.
-    # For more control, especially in production, consider structured logging.
-    if not app.logger.handlers: # Avoid reconfiguring if already configured by Flask/extensions
+    if not app.logger.handlers: 
         logging.basicConfig(level=log_level,
                             format='%(asctime)s %(levelname)s %(name)s : %(message)s')
 
     app.logger.debug(f"App running in DEBUG mode: {app.debug}")
     app.logger.debug(f"App running in TESTING mode: {app.testing}")
 
-    # Log status of key configurations
     for key in ['SUPABASE_URL', 'SUPABASE_KEY', 'OPENAI_API_KEY', 'YOUTUBE_API_KEY']:
         if not app.config.get(key):
             app.logger.warning(f"{key} is not configured. Dependent features may not work.")
@@ -103,9 +100,8 @@ def create_app(config_name=None):
     app.logger.info(f"CORS initialized. Allowing origins: {allowed_origins}")
 
     # --- Initialize Service Clients and attach to app.extensions ---
-    if 'extensions' not in app:
-        app.extensions = {}
-
+    # Flask initializes app.extensions as an empty dictionary. We can directly use it.
+    
     # Supabase Client
     if supabase_create_client and app.config.get('SUPABASE_URL') and app.config.get('SUPABASE_KEY'):
         try:
@@ -136,17 +132,6 @@ def create_app(config_name=None):
     # YouTube API Client (Google API Client)
     if build_google_service and app.config.get('YOUTUBE_API_KEY'):
         try:
-            # The build function typically needs serviceName, version, and developerKey.
-            # You might want to wrap this in a helper function or class in youtube_service.py
-            # For now, we'll just store the key and let the service module handle building the service object.
-            # Alternatively, you can build a basic service object here if it's simple enough.
-            # Example of building the service:
-            # app.extensions['youtube'] = build_google_service(
-            #     'youtube', 'v3', developerKey=app.config['YOUTUBE_API_KEY']
-            # )
-            # For more flexibility, often services manage their own client instantiation.
-            # Let's store the key and let the service handle the build.
-            # Or, if you prefer the client to be built here:
             app.extensions['youtube_service_object'] = build_google_service(
                  'youtube', 'v3', developerKey=app.config.get('YOUTUBE_API_KEY')
             )
@@ -161,13 +146,12 @@ def create_app(config_name=None):
 
     # --- Register Blueprints (API Routes) ---
     from .routes.analysis_routes import analysis_bp
-    app.register_blueprint(analysis_bp) # url_prefix='/api' is set in the blueprint itself
+    app.register_blueprint(analysis_bp) 
     app.logger.info("Analysis blueprint registered under /api.")
     
     @app.route('/health', methods=['GET'])
     def health_check():
         app.logger.debug("Health check endpoint called.")
-        # Check basic client initializations
         services_status = {
             "supabase": "OK" if app.extensions.get('supabase') else "Not Initialized",
             "openai": "OK" if app.extensions.get('openai') else "Not Initialized",

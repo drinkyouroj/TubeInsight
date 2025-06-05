@@ -1,16 +1,24 @@
 # File: backend/tubeinsight_app/routes/analysis_routes.py
 
 from flask import Blueprint, request, jsonify, current_app
+# Import the recommended authentication decorator
 from ..utils.auth_utils import supabase_user_from_token_required
 # Import service functions
-from ..services import sentiment_service, supabase_service, youtube_service # Ensure youtube_service is also available if needed directly, though sentiment_service uses it
-from supabase import User as SupabaseUser # For type hinting the injected user
+from ..services import sentiment_service, supabase_service
+# Correct import for Supabase User type for type hinting
+try:
+    from supabase.lib.auth.user import User as SupabaseUser
+except ImportError:
+    # Fallback if the path changes in future versions or for simplicity during issues
+    SupabaseUser = type('SupabaseUser', (object,), {'id': str}) # Basic mock for type hint
+    current_app.logger.warning("Could not import SupabaseUser from supabase.lib.auth.user. Using a mock type hint.")
+
 from datetime import datetime, timezone # For timestamps if needed directly in routes
 
 analysis_bp = Blueprint('analysis_bp', __name__, url_prefix='/api')
 
 @analysis_bp.route('/analyze-video', methods=['POST'])
-@supabase_user_from_token_required
+@supabase_user_from_token_required # Apply the decorator
 def analyze_video(current_supabase_user: SupabaseUser, **kwargs):
     """
     Endpoint to analyze a new YouTube video.
@@ -49,7 +57,7 @@ def analyze_video(current_supabase_user: SupabaseUser, **kwargs):
 
 
 @analysis_bp.route('/analyses', methods=['GET'])
-@supabase_user_from_token_required
+@supabase_user_from_token_required # Apply the decorator
 def get_analyses_history(current_supabase_user: SupabaseUser, **kwargs):
     """
     Endpoint to fetch the analysis history for the authenticated user.
@@ -76,7 +84,7 @@ def get_analyses_history(current_supabase_user: SupabaseUser, **kwargs):
 
 
 @analysis_bp.route('/analyses/<string:analysis_id_from_path>', methods=['GET'])
-@supabase_user_from_token_required
+@supabase_user_from_token_required # Apply the decorator
 def get_analysis_details(current_supabase_user: SupabaseUser, analysis_id_from_path: str, **kwargs):
     """
     Endpoint to fetch the details of a specific analysis run.
@@ -96,27 +104,14 @@ def get_analysis_details(current_supabase_user: SupabaseUser, analysis_id_from_p
             current_app.logger.warning(f"Analysis '{analysis_id_from_path}' not found or access denied for user '{user_id}'.")
             return jsonify({"error": "Analysis not found or access denied"}), 404
         
-        # If the service function returns an error dictionary (though get_analysis_detail_by_id currently returns None on error/not found)
-        # if isinstance(analysis_details, dict) and "error" in analysis_details:
-        #     status_code = analysis_details.get("status_code", 500)
-        #     return jsonify({"error": analysis_details["error"]}), status_code
-
-        # --- Prepare commentsByDate for the response ---
-        # This was part of the original response design for POST /analyze-video
-        # and should also be included when fetching a specific analysis.
-        # The `get_analysis_detail_by_id` currently fetches video info and category summaries.
-        # It doesn't fetch `commentsByDate`. We need to add that.
-        
-        # For now, let's assume `analysis_details` contains `youtube_video_id`
         youtube_video_id_for_comments = analysis_details.get('youtube_video_id')
         comments_by_date_data = []
         if youtube_video_id_for_comments:
             comments_by_date_data = supabase_service.get_comments_by_date_for_video(youtube_video_id_for_comments)
-            if comments_by_date_data is None: # Error fetching
+            if comments_by_date_data is None: 
                 comments_by_date_data = [] 
                 current_app.logger.warning(f"Could not fetch comments_by_date for video_id {youtube_video_id_for_comments} for analysis {analysis_id_from_path}, returning empty list.")
         
-        # Add commentsByDate to the response, similar to the /analyze-video response structure
         response_payload = {**analysis_details, "commentsByDate": comments_by_date_data}
         
         current_app.logger.info(f"Successfully retrieved details for analysis '{analysis_id_from_path}' for user '{user_id}'.")
@@ -125,4 +120,3 @@ def get_analysis_details(current_supabase_user: SupabaseUser, analysis_id_from_p
     except Exception as e:
         current_app.logger.exception(f"Unexpected error fetching analysis details for user '{user_id}', analysis '{analysis_id_from_path}': {e}")
         return jsonify({"error": "An unexpected server error occurred."}), 500
-
