@@ -8,38 +8,15 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
+  CardFooter, // Keep if you might add a footer to cards later
 } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button'; // For a "Back to History" button
+import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { BarChart3, PieChart, MessageSquareText, AlertTriangleIcon, CheckCircle, ThumbsUp, ThumbsDown, Meh, Info } from 'lucide-react';
+import { BarChart3, PieChart, MessageSquareText, AlertTriangleIcon as AlertTriangle, CheckCircle, ThumbsUp, ThumbsDown, Meh, Info, ChevronLeft } from 'lucide-react';
 import type { Metadata, ResolvingMetadata } from 'next';
-
-// Define the expected shape of the full analysis data
-// This should match what your backend API returns for a specific analysisId
-// or what your direct Supabase query would fetch.
-interface SentimentCategoryDetail {
-  category_name: string;
-  comment_count_in_category: number;
-  summary_text: string;
-}
-
-interface AnalysisDetailData {
-  analysis_id: string;
-  youtube_video_id: string;
-  analysis_timestamp: string;
-  total_comments_analyzed: number;
-  videos: { // Assuming a nested structure from a join with the 'videos' table
-    video_title: string | null;
-    channel_title: string | null;
-  } | null;
-  analysis_category_summaries: SentimentCategoryDetail[];
-  // commentsByDate will likely be fetched separately or passed if part of a larger object
-  // For now, let's assume it's part of this main data object for simplicity,
-  // though in a real app, you might fetch it in a dedicated component.
-  commentsByDate?: Array<{ date: string; count: number }>;
-}
-
+import { fetchAnalysisDetails, type AnalysisResult } from '@/lib/api'; // Import API function and type
+import SentimentPieChart, { type SentimentPieChartDataPoint } from '@/components/charts/SentimentPieChart';
+import CommentsByDateBarChart, { type CommentsByDateDataPoint } from '@/components/charts/CommentsByDateBarChart';
 
 // Props for the page component, including the dynamic segment
 type AnalysisDetailPageProps = {
@@ -53,37 +30,50 @@ export async function generateMetadata(
   { params }: AnalysisDetailPageProps,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const supabase = createSupabaseServerClient();
   const { analysisId } = params;
+  let pageTitle = 'Analysis Details'; // Default title
+  let pageDescription = 'Detailed sentiment analysis results from TubeInsight.';
 
-  // Fetch minimal data for the title, e.g., video title
-  // Ensure user has access if this data is sensitive before login.
-  // For this metadata, we might just show a generic title if video title isn't readily available or if it's too slow.
-  let videoTitle = 'Analysis Result'; // Default title
+  // Note: For metadata, ensure this fetch is very fast or has fallbacks.
+  // The `fetchAnalysisDetails` includes auth; for public metadata this might be an issue
+  // if Supabase client for metadata generation doesn't have auth context.
+  // However, since this is a protected page, user should be auth'd.
+  // If this page were public, you'd need a different strategy for metadata.
   try {
-    const { data: analysis } = await supabase
+    // We can't use the full fetchAnalysisDetails directly here if it relies on
+    // a client-side token mechanism that isn't available at build/metadata gen time for all cases.
+    // A simplified direct Supabase query for just the title might be better if that's an issue.
+    // For now, let's assume `fetchAnalysisDetails` can be adapted or a similar lightweight query exists.
+
+    // Simpler approach: Fetch just the video title for metadata if possible
+    const supabase = createSupabaseServerClient(); // Server client for direct DB access if needed
+     const { data: analysisMeta } = await supabase
       .from('analyses')
       .select('videos(video_title)')
       .eq('analysis_id', analysisId)
-      .maybeSingle(); // Use maybeSingle to handle null if not found
+      // .eq('user_id', session.user.id) // Can't easily get session.user.id here without more setup
+      .maybeSingle();
 
-      if (analysis && analysis.videos && analysis.videos.video_title) {
-        videoTitle = analysis.videos.video_title;
-      }
+    if (analysisMeta && analysisMeta.videos && analysisMeta.videos.video_title) {
+      pageTitle = `${analysisMeta.videos.video_title} - Analysis`;
+      pageDescription = `Sentiment analysis for "${analysisMeta.videos.video_title}". View detailed insights including sentiment breakdown, category summaries, and comment trends.`;
+    }
   } catch (error) {
     console.error("Error fetching video title for metadata:", error);
+    // Use default title if fetch fails
   }
 
-
   return {
-    title: `${videoTitle} - Analysis`,
-    description: `Detailed sentiment analysis results for video: ${videoTitle}.`,
+    title: pageTitle,
+    description: pageDescription,
   };
 }
 
 
 export default async function AnalysisDetailPage({ params }: AnalysisDetailPageProps) {
   const { analysisId } = params;
+
+  // Session check (middleware should also cover this)
   const supabase = createSupabaseServerClient();
   const {
     data: { session },
@@ -93,165 +83,139 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
     redirect(`/login?next=/analysis/${analysisId}`);
   }
 
-  // Fetch the specific analysis details from Supabase
-  // This query should join 'analyses' with 'videos' and 'analysis_category_summaries'
-  // Also, very important: ensure the analysis belongs to the currently authenticated user.
-  const { data: analysisData, error: analysisError } = await supabase
-    .from('analyses')
-    .select(`
-      analysis_id,
-      youtube_video_id,
-      analysis_timestamp,
-      total_comments_analyzed,
-      videos ( video_title, channel_title ),
-      analysis_category_summaries ( category_name, comment_count_in_category, summary_text )
-    `)
-    .eq('analysis_id', analysisId)
-    .eq('user_id', session.user.id) // Crucial for security: user can only see their own analyses
-    .single(); // .single() expects exactly one row or throws an error/returns null
+  let analysisData: AnalysisResult | null = null;
+  let fetchError: string | null = null;
 
-  // Placeholder for commentsByDate - In a real app, you'd fetch this too.
-  // For example, from your 'comments' table based on 'youtube_video_id'
-  // const { data: commentsData, error: commentsError } = await supabase
-  //   .from('comments')
-  //   .select('published_at')
-  //   .eq('youtube_video_id', analysisData?.youtube_video_id)
-  //   // Aggregate counts by date here or process client-side/in a dedicated component
+  try {
+    // Fetch the specific analysis details using the API service function.
+    // This function handles authentication by including the token.
+    analysisData = await fetchAnalysisDetails(analysisId);
+  } catch (error) {
+    console.error(`Error fetching analysis details for ID '${analysisId}':`, error);
+    fetchError = error instanceof Error ? error.message : 'Failed to load analysis details.';
+    if (error instanceof Error && error.message.toLowerCase().includes('not found')) {
+        // Handle 404 specifically if the API service throws a distinct error or message
+        // For now, this is a generic catch. The API service might throw a custom error.
+    }
+  }
 
-  // For now, a static placeholder for commentsByDate
-  const commentsByDatePlaceholder = [
-    { date: '2024-01-01', count: 10 },
-    { date: '2024-01-02', count: 15 },
-    { date: '2024-01-03', count: 5 },
-  ];
-
-  if (analysisError || !analysisData) {
-    console.error('Error fetching analysis details:', analysisError);
+  if (fetchError || !analysisData) {
     return (
       <div className="container mx-auto flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center space-y-4 p-4 text-center">
-        <AlertTriangleIcon className="h-16 w-16 text-destructive" />
-        <h2 className="text-2xl font-semibold text-foreground">Analysis Not Found</h2>
+        <AlertTriangle className="h-16 w-16 text-destructive" />
+        <h2 className="text-2xl font-semibold text-foreground">
+          {fetchError && fetchError.toLowerCase().includes('not found') ? 'Analysis Not Found' : 'Error Loading Analysis'}
+        </h2>
         <p className="text-muted-foreground">
-          The analysis you are looking for could not be found, or you do not have permission to view it.
+          {fetchError || 'The analysis you are looking for could not be loaded, or you do not have permission to view it.'}
         </p>
         <Link href="/history" legacyBehavior passHref>
-          <Button variant="outline">Back to History</Button>
+          <Button variant="outline" className="mt-4">
+            <ChevronLeft className="mr-2 h-4 w-4" /> Back to History
+          </Button>
         </Link>
       </div>
     );
   }
 
-  // Cast analysisData to the defined type for better type safety in JSX
-  const typedAnalysisData = analysisData as AnalysisDetailData;
-  const videoTitle = typedAnalysisData.videos?.video_title || 'Untitled Video';
+  // Prepare data for charts
+  const pieChartData: SentimentPieChartDataPoint[] = analysisData.sentimentBreakdown.map(
+    (item) => ({
+      category_name: item.category,
+      comment_count_in_category: item.count,
+    })
+  );
 
-  // Helper to get icon for sentiment category
+  const barChartData: CommentsByDateDataPoint[] = analysisData.commentsByDate.map(
+    (item) => ({
+      date: item.date, // Assuming date is already in 'YYYY-MM-DD' or parseable format
+      count: item.count,
+    })
+  );
+
+  const videoTitle = analysisData.videoTitle || 'Untitled Video';
+
   const getSentimentIcon = (categoryName: string) => {
     switch (categoryName.toLowerCase()) {
-      case 'positive':
-        return <ThumbsUp className="mr-2 h-5 w-5 text-green-500" />;
-      case 'neutral':
-        return <Meh className="mr-2 h-5 w-5 text-slate-500" />;
-      case 'critical':
-        return <MessageSquareText className="mr-2 h-5 w-5 text-blue-500" />;
-      case 'toxic':
-        return <AlertTriangleIcon className="mr-2 h-5 w-5 text-red-500" />;
-      default:
-        return <Info className="mr-2 h-5 w-5 text-muted-foreground" />;
+      case 'positive': return <ThumbsUp className="mr-2 h-5 w-5 text-green-500" />;
+      case 'neutral':  return <Meh className="mr-2 h-5 w-5 text-slate-500" />;
+      case 'critical': return <MessageSquareText className="mr-2 h-5 w-5 text-blue-500" />;
+      case 'toxic':    return <ThumbsDown className="mr-2 h-5 w-5 text-red-500" />; // Changed from AlertTriangle
+      default:         return <Info className="mr-2 h-5 w-5 text-muted-foreground" />;
     }
   };
-
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <Link href="/history" legacyBehavior passHref>
-            <Button variant="outline" size="sm" className="mb-2">
-              &larr; Back to History
+            <Button variant="outline" size="sm" className="mb-3 inline-flex items-center">
+              <ChevronLeft className="mr-1.5 h-4 w-4" />
+              Back to History
             </Button>
           </Link>
           <h1 className="truncate text-2xl font-bold text-foreground sm:text-3xl" title={videoTitle}>
             Analysis: {videoTitle}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Channel: {typedAnalysisData.videos?.channel_title || 'N/A'}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Analyzed on: {new Date(typedAnalysisData.analysis_timestamp).toLocaleString()} | Processed: {typedAnalysisData.total_comments_analyzed} comments
+          {/*
+            If channel title is available in analysisData (e.g., analysisData.channelTitle), display it.
+            Our AnalysisResult type doesn't explicitly have channelTitle, but videoTitle implies it might come from a videos join.
+            Let's assume it might be part of videoTitle or not available directly here unless fetched.
+          */}
+          {/* <p className="text-sm text-muted-foreground">Channel: {analysisData.videos?.channel_title || 'N/A'}</p> */}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Analyzed on: {new Date(analysisData.analysisTimestamp).toLocaleString()} | Processed: {analysisData.totalCommentsAnalyzed} comments
           </p>
         </div>
-        {/* Potentially add a "Re-analyze" button or other actions here */}
+        {/* Future: "Re-analyze" button or other actions */}
       </div>
 
-      {/* Placeholder for Charts (Pie Chart for Sentiment Breakdown, Bar Chart for Comments by Date) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <PieChart className="mr-2 h-5 w-5 text-primary" />
-              Sentiment Breakdown
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border border-dashed border-border bg-background/50 p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Sentiment Pie Chart will be displayed here.
-              </p>
-              {/* <SentimentPieChart data={typedAnalysisData.analysis_category_summaries} /> */}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <BarChart3 className="mr-2 h-5 w-5 text-primary" />
-              Comments by Date
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border border-dashed border-border bg-background/50 p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Comments by Date Bar Chart will be displayed here using data like:
-                {JSON.stringify(commentsByDatePlaceholder)}
-              </p>
-              {/* <CommentsByDateBarChart data={commentsByDatePlaceholder} /> */}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-2">
+          <SentimentPieChart data={pieChartData} />
+        </div>
+        <div className="lg:col-span-3">
+          <CommentsByDateBarChart data={barChartData} />
+        </div>
       </div>
 
-      {/* Sentiment Category Summaries */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-semibold text-foreground">
-          Category Summaries
-        </h2>
-        {typedAnalysisData.analysis_category_summaries && typedAnalysisData.analysis_category_summaries.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {typedAnalysisData.analysis_category_summaries.map((summary) => (
-              <Card key={summary.category_name} className="shadow-md transition-shadow hover:shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center capitalize">
-                    {getSentimentIcon(summary.category_name)}
-                    {summary.category_name} Comments
+      {/* Sentiment Category Summaries Section */}
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-xl sm:text-2xl">Category Summaries</CardTitle>
+          <CardDescription>
+            AI-generated summaries for each sentiment category.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {analysisData.sentimentBreakdown && analysisData.sentimentBreakdown.length > 0 ? (
+            analysisData.sentimentBreakdown.map((summaryItem) => (
+              <Card key={summaryItem.category} className="bg-card/50 dark:bg-slate-900/70">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center text-lg capitalize">
+                    {getSentimentIcon(summaryItem.category)}
+                    {summaryItem.category} Comments
                   </CardTitle>
-                  <CardDescription>
-                    {summary.comment_count_in_category} comments classified in this category.
+                  <CardDescription className="text-xs">
+                    {summaryItem.count} {summaryItem.count === 1 ? 'comment' : 'comments'} classified.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-foreground/80">
-                    {summary.summary_text || 'No summary available.'}
+                  <p className="text-sm text-foreground/90">
+                    {summaryItem.summary || 'No summary available for this category.'}
                   </p>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground">No category summaries available for this analysis.</p>
-        )}
-      </div>
+            ))
+          ) : (
+            <p className="py-4 text-center text-muted-foreground">
+              No category summaries are available for this analysis.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
