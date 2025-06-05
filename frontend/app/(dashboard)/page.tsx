@@ -13,50 +13,35 @@ import {
   CardContent,
   CardFooter,
 } from '@/components/ui/Card';
-import { ArrowRight, BarChart3, MessageSquareText, AlertTriangle, CheckCircle2 } from 'lucide-react'; // Icons for cards
+import { ArrowRight, BarChart3, MessageSquareText, AlertTriangle, CheckCircle2, Youtube } from 'lucide-react'; 
 
 export default async function DashboardPage() {
   const supabase = createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  // Use getUser() instead of getSession() for server-side auth state
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!session) {
-    // This should ideally be caught by middleware, but it's good practice
-    // to have a check in Server Components that require auth.
-    redirect('/login');
+  if (!user) { // Check for user object instead of session
+    redirect('/login'); 
   }
-
-  // Placeholder: In a real scenario, you might fetch the most recent analysis here
-  // const { data: recentAnalysis, error } = await supabase
-  //   .from('analyses')
-  //   .select('*, videos(video_title), analysis_category_summaries(*)')
-  //   .eq('user_id', session.user.id)
-  //   .order('analysis_timestamp', { ascending: false })
-  //   .limit(1)
-  //   .single();
 
   return (
     <div className="space-y-8">
-      {/* Welcome Header and Primary Action */}
       <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-            Welcome, {session.user?.user_metadata?.full_name || session.user?.email?.split('@')[0] || 'Creator'}!
+            Welcome, {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Creator'}!
           </h1>
           <p className="mt-1 text-muted-foreground">
             Ready to dive into your YouTube comment insights?
           </p>
         </div>
-        <Link href="/analyze" legacyBehavior passHref>
-          <Button size="lg" className="w-full sm:w-auto">
+        <Link href="/analyze"> 
+          <Button size="lg" className="w-full sm:w-auto flex items-center"> 
             Analyze New Video <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </Link>
       </div>
-
-      {/* Placeholder for a Quick Overview of the latest analysis */}
-      {/* You would conditionally render this based on 'recentAnalysis' data */}
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -72,25 +57,15 @@ export default async function DashboardPage() {
             <p className="text-sm text-muted-foreground">
               Your latest video analysis summary and key sentiment scores will appear here.
             </p>
-            {/*
-            Example structure if recentAnalysis exists:
-            <div>
-              <h4 className="font-semibold">{recentAnalysis.videos.video_title}</h4>
-              <p>Positive: {recentAnalysis.analysis_category_summaries.find(s => s.category_name === 'Positive')?.comment_count_in_category || 0}</p>
-              // ... other sentiment counts
-            </div>
-            */}
           </div>
         </CardContent>
         <CardFooter>
-            <Link href="/history" legacyBehavior passHref>
+            <Link href="/history">
                  <Button variant="outline" className="w-full sm:w-auto">View All Analyses</Button>
             </Link>
         </CardFooter>
       </Card>
 
-
-      {/* Feature/Navigation Cards */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
@@ -108,7 +83,7 @@ export default async function DashboardPage() {
             </p>
           </CardContent>
            <CardFooter>
-             <Link href="/analyze" legacyBehavior passHref>
+             <Link href="/analyze">
                 <Button variant="secondary" className="w-full">Analyze a Video</Button>
             </Link>
           </CardFooter>
@@ -130,7 +105,7 @@ export default async function DashboardPage() {
             </p>
           </CardContent>
            <CardFooter>
-             <Link href="/history" legacyBehavior passHref>
+             <Link href="/history">
                 <Button variant="secondary" className="w-full">Review Past Feedback</Button>
             </Link>
           </CardFooter>
@@ -152,7 +127,7 @@ export default async function DashboardPage() {
             </p>
           </CardContent>
            <CardFooter>
-             <Link href="/analyze" legacyBehavior passHref>
+             <Link href="/analyze">
                 <Button variant="secondary" className="w-full">Get Started</Button>
             </Link>
           </CardFooter>

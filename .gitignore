@@ -21,7 +21,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+#lib/
 lib64/
 parts/
 sdist/
@@ -80,3 +80,4 @@ yarn-error.log*
 .env.*.local # Covers other environment-specific .local files
 
 # Build
+frontend_backup/

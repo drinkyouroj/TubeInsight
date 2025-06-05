@@ -10,7 +10,7 @@ import logging
 try:
     from config import config_by_name, get_config_name
 except ImportError:
-    print("Warning: Could not import 'config' directly. Ensure 'backend/config.py' is accessible from the script's execution path or PYTHONPATH.")
+    print("WARNING: Could not import 'config' directly. Ensure 'backend/config.py' is accessible from the script's execution path or PYTHONPATH.")
     # Define a MinimalConfig as a fallback if config.py is not found
     class MinimalConfig:
         SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'a_default_very_secret_key_CHANGE_ME_IN_ENV')
@@ -74,7 +74,7 @@ def create_app(config_name=None):
         app.logger.error(f"Invalid configuration name: {config_name}. Falling back to 'default' or MinimalConfig.")
         selected_config = config_by_name.get('default', MinimalConfig)
     app.config.from_object(selected_config)
-    if hasattr(selected_config, 'init_app'): # Ensure init_app exists
+    if hasattr(selected_config, 'init_app'): 
         selected_config.init_app(app)
     app.logger.info(f"Flask app configured using '{config_name}' settings.")
 
@@ -95,12 +95,19 @@ def create_app(config_name=None):
             app.logger.warning(f"{key} is not configured. Dependent features may not work.")
 
     # --- Initialize Extensions ---
+    # Restore specific CORS configuration
     allowed_origins = app.config.get('FRONTEND_URL', '*')
     CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
-    app.logger.info(f"CORS initialized. Allowing origins: {allowed_origins}")
+    app.logger.info(f"CORS initialized. Allowing origins for /api/*: {allowed_origins}")
+    # If /health route is outside /api/* and needs CORS, it might need separate handling or global CORS.
+    # For now, assuming /health doesn't strictly need CORS if accessed directly by you for testing.
+    # If frontend needs to call /health, then it should also be covered by a CORS policy.
+    # To be safe for now with /health outside /api/*, we can add it or make CORS more global if issues persist.
+    # Example for also covering /health:
+    # CORS(app, resources={r"/api/*": {"origins": allowed_origins}, r"/health": {"origins": allowed_origins}})
+
 
     # --- Initialize Service Clients and attach to app.extensions ---
-    # Flask initializes app.extensions as an empty dictionary. We can directly use it.
     
     # Supabase Client
     if supabase_create_client and app.config.get('SUPABASE_URL') and app.config.get('SUPABASE_KEY'):
@@ -149,9 +156,10 @@ def create_app(config_name=None):
     app.register_blueprint(analysis_bp) 
     app.logger.info("Analysis blueprint registered under /api.")
     
+    # Restore original health check logic
     @app.route('/health', methods=['GET'])
     def health_check():
-        app.logger.debug("Health check endpoint called.")
+        app.logger.debug("Health check endpoint called (full).")
         services_status = {
             "supabase": "OK" if app.extensions.get('supabase') else "Not Initialized",
             "openai": "OK" if app.extensions.get('openai') else "Not Initialized",
@@ -161,4 +169,3 @@ def create_app(config_name=None):
 
     app.logger.info("Flask app instance created successfully.")
     return app
-

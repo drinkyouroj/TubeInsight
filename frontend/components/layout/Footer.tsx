@@ -10,7 +10,7 @@ export default function Footer() {
     <footer className="border-t border-border bg-background/95 py-8 text-center shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto space-y-2 px-4 text-sm text-muted-foreground">
         <p>
-          &copy; {new Date().getFullYear()} drinkyouroj. All rights reserved.
+          &copy; {new Date().getFullYear()} Justin Hearn. All rights reserved.
         </p>
         <p>
           Built with ❤️ by{' '}
@@ -20,7 +20,7 @@ export default function Footer() {
             rel="noopener noreferrer"
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
-            Justin Hearn / drinkYourOJ
+            drinkYourOJ
           </Link>
         </p>
         <div className="mt-2 flex items-center justify-center">

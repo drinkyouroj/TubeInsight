@@ -1,14 +1,15 @@
 // File: frontend/components/auth/AuthForm.tsx
-'use client'; // This component interacts with browser APIs (router, window) and Supabase client.
+'use client'; 
 
 import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared'; // Predefined theme for the Auth UI
-import { createClient } from '@/lib/supabase/client'; // Your client-side Supabase client
-import { useRouter } from 'next/navigation'; // Corrected import
-import { useEffect } from 'react';
+import { ThemeSupa } from '@supabase/auth-ui-shared'; 
+import { createClient } from '@/lib/supabase/client'; 
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react'; // Added useState import
 import { LogIn, ExternalLink } from 'lucide-react'; 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button'; 
+// Button component is not used directly in this version of AuthForm, but can be kept for future custom actions
+// import { Button } from '@/components/ui/Button'; 
 import Link from 'next/link';
 
 export default function AuthForm() {
@@ -20,10 +21,9 @@ export default function AuthForm() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // Check for 'next' query parameter for redirection after login
         const url = new URL(window.location.href);
         const nextPath = url.searchParams.get('next');
-        router.push(nextPath || '/'); // Redirect to intended page or dashboard
+        router.push(nextPath || '/'); 
         router.refresh(); 
       } else if (event === 'SIGNED_OUT') {
         router.push('/login');
@@ -33,8 +33,13 @@ export default function AuthForm() {
     return () => subscription.unsubscribe();
   }, [supabase, router]);
 
-  // Ensure window.location.origin is only accessed on client
-  const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : '';
+  // Ensure window.location.origin is only accessed on client to prevent SSR errors for redirectTo
+  const [redirectToUrl, setRedirectToUrl] = useState('');
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setRedirectToUrl(`${window.location.origin}/auth/callback`);
+    }
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 py-12 bg-slate-50 dark:bg-slate-900">
@@ -87,10 +92,10 @@ export default function AuthForm() {
                   },
                 },
               },
-              extend: true, // Allow extending the theme
+              extend: true, 
             }}
             providers={['google', 'github']} 
-            redirectTo={redirectTo} // Use client-safe redirect URL
+            redirectTo={redirectToUrl} // Use state variable for redirectTo
             socialLayout="horizontal"
             localization={{
               variables: {
@@ -119,17 +124,21 @@ export default function AuthForm() {
                 }
               },
             }}
-            view="sign_in" 
+            // view="sign_in" // This was correctly removed/commented out previously
           />
         </CardContent>
          <CardFooter className="flex flex-col items-center text-center px-6 pt-4 pb-6 border-t dark:border-slate-800">
             <p className="text-xs text-muted-foreground mb-2">
                 By signing in, you agree to our (non-existent) Terms of Service and Privacy Policy.
             </p>
-            <Link href="https://github.com/your-repo/tubeinsight" target="_blank" legacyBehavior>
-                 <a className="text-xs text-primary hover:underline inline-flex items-center">
-                    View Project on GitHub <ExternalLink className="ml-1 h-3 w-3" />
-                </a>
+            {/* Corrected Link component usage: removed legacyBehavior and nested <a> */}
+            <Link
+              href="https://github.com/your-repo/tubeinsight" // Replace with your actual repo URL
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline inline-flex items-center"
+            >
+              View Project on GitHub <ExternalLink className="ml-1 h-3 w-3" />
             </Link>
         </CardFooter>
       </Card>
