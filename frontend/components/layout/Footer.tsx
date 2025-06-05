@@ -10,22 +10,22 @@ export default function Footer() {
     <footer className="border-t border-border bg-background/95 py-8 text-center shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto space-y-2 px-4 text-sm text-muted-foreground">
         <p>
-          &copy; {new Date().getFullYear()} TubeInsight. All rights reserved.
+          &copy; {new Date().getFullYear()} drinkyouroj. All rights reserved.
         </p>
         <p>
           Built with ❤️ by{' '}
           <Link
-            href="https://github.com/your-username" // Replace with your GitHub profile
+            href="https://github.com/drinkyouroj" // Replace with your GitHub profile
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
-            Your Name/Organization
+            Justin Hearn / drinkYourOJ
           </Link>
         </p>
         <div className="mt-2 flex items-center justify-center">
           <Link
-            href="https://github.com/your-username/tubeinsight" // Replace with your project's GitHub repo
+            href="https://github.com/drinkyouroj/tubeinsight" // Replace with your project's GitHub repo
             target="_blank"
             rel="noopener noreferrer"
             aria-label="View project on GitHub"
