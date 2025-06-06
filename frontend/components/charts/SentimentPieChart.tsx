@@ -19,7 +19,7 @@ import {
   Sector, // For custom active shape
   type SectorProps // Type for custom active shape props
 } from 'recharts';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 // Define the expected data structure for the pie chart
 // This should align with the 'analysis_category_summaries' data
@@ -73,10 +73,11 @@ const prepareChartData = (data: SentimentPieChartDataPoint[]) => {
 };
 
 // Custom active shape for the pie chart (optional, for interactivity)
-const renderActiveShape = (props: SectorProps) => {
+const renderActiveShape = (props: any) => {
   const RADIAN = Math.PI / 180;
   // Ensure all necessary props are defined before destructuring or using
-  const { cx, cy, midAngle, innerRadius = 0, outerRadius = 0, startAngle, endAngle, fill, payload, percent, value } = props;
+  // Temporarily cast to any to check runtime availability of props
+  const { cx, cy, midAngle, innerRadius = 0, outerRadius = 0, startAngle, endAngle, fill, payload, percent, value } = props as any;
 
   if (cx === undefined || cy === undefined || midAngle === undefined || innerRadius === undefined || outerRadius === undefined || startAngle === undefined || endAngle === undefined || fill === undefined || payload === undefined || percent === undefined || value === undefined) {
     return null; // Or some fallback rendering
