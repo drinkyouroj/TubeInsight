@@ -1,10 +1,12 @@
 # File: backend/tubeinsight_app/__init__.py
 
 import os
-from flask import Flask
+import sys
+import logging
+from pathlib import Path
+from flask import Flask, request
 from flask_cors import CORS
 from dotenv import load_dotenv
-import logging
 
 # Attempt to import configurations
 try:
@@ -95,17 +97,31 @@ def create_app(config_name=None):
             app.logger.warning(f"{key} is not configured. Dependent features may not work.")
 
     # --- Initialize Extensions ---
-    # Restore specific CORS configuration
-    allowed_origins = app.config.get('FRONTEND_URL', '*')
-    CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
-    app.logger.info(f"CORS initialized. Allowing origins for /api/*: {allowed_origins}")
-    # If /health route is outside /api/* and needs CORS, it might need separate handling or global CORS.
-    # For now, assuming /health doesn't strictly need CORS if accessed directly by you for testing.
-    # If frontend needs to call /health, then it should also be covered by a CORS policy.
-    # To be safe for now with /health outside /api/*, we can add it or make CORS more global if issues persist.
-    # Example for also covering /health:
-    # CORS(app, resources={r"/api/*": {"origins": allowed_origins}, r"/health": {"origins": allowed_origins}})
+    # Configure CORS for API routes
+    if app.config.get('FRONTEND_URL') == '*':
+        allowed_origins = ['*']
+        app.logger.info("CORS configured to allow all origins (not recommended for production).")
+    elif app.config.get('ALLOWED_ORIGINS'):
+        # Split string of comma-separated origins into a list
+        allowed_origins = app.config.get('ALLOWED_ORIGINS').split(',')
+        app.logger.info(f"CORS initialized. Allowing origins from ALLOWED_ORIGINS: {allowed_origins}")
+    else:
+        # Use FRONTEND_URL as default if ALLOWED_ORIGINS not specified
+        frontend_url = app.config.get('FRONTEND_URL')
+        # For development, also allow localhost:3000
+        allowed_origins = [frontend_url, 'http://localhost:3000']
+        app.logger.info(f"Using multiple origins for CORS: {allowed_origins}")
 
+    # Initialize CORS with proper configuration for handling preflight requests
+    cors = CORS(
+        app, 
+        resources={r"/api/*": {"origins": allowed_origins}},
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        expose_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"]
+    )
+    app.logger.info(f"CORS initialized. Allowing origins for /api/*: {allowed_origins}")
 
     # --- Initialize Service Clients and attach to app.extensions ---
     
@@ -157,7 +173,7 @@ def create_app(config_name=None):
     app.logger.info("Analysis blueprint registered under /api.")
     
     # Restore original health check logic
-    @app.route('/health', methods=['GET'])
+    @app.route('/api/health', methods=['GET'])
     def health_check():
         app.logger.debug("Health check endpoint called (full).")
         services_status = {
@@ -166,6 +182,46 @@ def create_app(config_name=None):
             "youtube": "OK" if app.extensions.get('youtube_service_object') else "Not Initialized",
         }
         return {"status": "healthy", "message": "TubeInsight API is running!", "services": services_status}, 200
+
+    # Debug routes endpoint to show all registered routes
+    @app.route('/api/debug-routes', methods=['GET'])
+    def debug_routes():
+        import urllib
+        output = []
+        for rule in app.url_map.iter_rules():
+            options = {}
+            for arg in rule.arguments:
+                options[arg] = f"[{arg}]"
+            methods = ','.join(rule.methods)
+            url = urllib.parse.unquote(rule.rule)
+            line = f"{rule.endpoint:50s} {methods:20s} {url}"
+            output.append(line)
+        
+        formatted_routes = "<br>".join(sorted(output))
+        html_output = f"<h1>Registered Routes:</h1><pre>{formatted_routes}</pre>"
+        
+        # Also log all routes for server-side debugging
+        app.logger.info("All registered routes:")
+        for line in sorted(output):
+            app.logger.info(f"Route: {line}")
+            
+        return html_output
+
+    # Authentication debugging endpoint - NO AUTH REQUIRED
+    @app.route('/api/debug-auth', methods=['GET'])
+    def debug_auth():
+        """Debug endpoint to check authentication headers"""
+        auth_header = request.headers.get('Authorization', 'None')
+        # Mask sensitive info in tokens for logging
+        masked_auth = "None" if auth_header == "None" else auth_header[:15] + "..." + auth_header[-5:] if len(auth_header) > 20 else auth_header
+        app.logger.info(f"Auth debugging request received. Auth header: {masked_auth}")
+        
+        return {
+            "message": "Auth debugging information",
+            "auth_header_present": auth_header != "None",
+            "request_headers": dict(request.headers),
+            "remote_addr": request.remote_addr
+        }, 200
 
     app.logger.info("Flask app instance created successfully.")
     return app

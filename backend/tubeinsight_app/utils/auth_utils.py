@@ -91,6 +91,10 @@ def supabase_user_from_token_required(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Allow OPTIONS requests to pass through for CORS preflight
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
+            
         supabase_client: SupabaseClient = current_app.extensions.get('supabase')
         if not supabase_client:
             current_app.logger.error("Supabase client not available in app extensions for token validation.")
