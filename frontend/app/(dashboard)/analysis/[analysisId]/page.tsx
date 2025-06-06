@@ -8,50 +8,39 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter, // Keep if you might add a footer to cards later
 } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { BarChart3, PieChart, MessageSquareText, AlertTriangleIcon as AlertTriangle, CheckCircle, ThumbsUp, ThumbsDown, Meh, Info, ChevronLeft } from 'lucide-react';
 import type { Metadata, ResolvingMetadata } from 'next';
-import { fetchAnalysisDetails, type AnalysisResult } from '@/lib/api'; // Import API function and type
+import { fetchAnalysisDetails, type AnalysisResult } from '@/lib/api';
 import SentimentPieChart, { type SentimentPieChartDataPoint } from '@/components/charts/SentimentPieChart';
 import CommentsByDateBarChart, { type CommentsByDateDataPoint } from '@/components/charts/CommentsByDateBarChart';
 
-// Props for the page component, including the dynamic segment
-type AnalysisDetailPageProps = {
-  params: {
-    analysisId: string;
-  };
+// This Next.js option can sometimes help with build issues on dynamic pages.
+// It forces the page to be rendered dynamically at request time.
+export const dynamic = 'force-dynamic';
+
+// Define the props for generateMetadata inline.
+type MetadataProps = {
+  params: { analysisId: string };
+  searchParams?: { [key: string]: string | string[] | undefined };
 };
 
-// Dynamic metadata for the page
 export async function generateMetadata(
-  { params }: AnalysisDetailPageProps,
+  { params }: MetadataProps,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const { analysisId } = params;
-  let pageTitle = 'Analysis Details'; // Default title
+  let pageTitle = 'Analysis Details';
   let pageDescription = 'Detailed sentiment analysis results from TubeInsight.';
 
-  // Note: For metadata, ensure this fetch is very fast or has fallbacks.
-  // The `fetchAnalysisDetails` includes auth; for public metadata this might be an issue
-  // if Supabase client for metadata generation doesn't have auth context.
-  // However, since this is a protected page, user should be auth'd.
-  // If this page were public, you'd need a different strategy for metadata.
   try {
-    // We can't use the full fetchAnalysisDetails directly here if it relies on
-    // a client-side token mechanism that isn't available at build/metadata gen time for all cases.
-    // A simplified direct Supabase query for just the title might be better if that's an issue.
-    // For now, let's assume `fetchAnalysisDetails` can be adapted or a similar lightweight query exists.
-
-    // Simpler approach: Fetch just the video title for metadata if possible
-    const supabase = createSupabaseServerClient(); // Server client for direct DB access if needed
+    const supabase = createSupabaseServerClient();
      const { data: analysisMeta } = await supabase
       .from('analyses')
       .select('videos(video_title)')
       .eq('analysis_id', analysisId)
-      // .eq('user_id', session.user.id) // Can't easily get session.user.id here without more setup
       .maybeSingle();
 
     if (analysisMeta && analysisMeta.videos && analysisMeta.videos.video_title) {
@@ -60,7 +49,6 @@ export async function generateMetadata(
     }
   } catch (error) {
     console.error("Error fetching video title for metadata:", error);
-    // Use default title if fetch fails
   }
 
   return {
@@ -69,17 +57,21 @@ export async function generateMetadata(
   };
 }
 
+// Define the props for the page component inline as well.
+type PageProps = {
+  params: { analysisId: string };
+  searchParams?: { [key: string]: string | string[] | undefined };
+};
 
-export default async function AnalysisDetailPage({ params }: AnalysisDetailPageProps) {
+export default async function AnalysisDetailPage({ params }: PageProps) {
   const { analysisId } = params;
 
-  // Session check (middleware should also cover this)
   const supabase = createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect(`/login?next=/analysis/${analysisId}`);
   }
 
@@ -87,16 +79,10 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
   let fetchError: string | null = null;
 
   try {
-    // Fetch the specific analysis details using the API service function.
-    // This function handles authentication by including the token.
     analysisData = await fetchAnalysisDetails(analysisId);
   } catch (error) {
     console.error(`Error fetching analysis details for ID '${analysisId}':`, error);
     fetchError = error instanceof Error ? error.message : 'Failed to load analysis details.';
-    if (error instanceof Error && error.message.toLowerCase().includes('not found')) {
-        // Handle 404 specifically if the API service throws a distinct error or message
-        // For now, this is a generic catch. The API service might throw a custom error.
-    }
   }
 
   if (fetchError || !analysisData) {
@@ -109,8 +95,8 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
         <p className="text-muted-foreground">
           {fetchError || 'The analysis you are looking for could not be loaded, or you do not have permission to view it.'}
         </p>
-        <Link href="/history" legacyBehavior passHref>
-          <Button variant="outline" className="mt-4">
+        <Link href="/history">
+          <Button variant="outline" className="mt-4 flex items-center">
             <ChevronLeft className="mr-2 h-4 w-4" /> Back to History
           </Button>
         </Link>
@@ -128,7 +114,7 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
 
   const barChartData: CommentsByDateDataPoint[] = analysisData.commentsByDate.map(
     (item) => ({
-      date: item.date, // Assuming date is already in 'YYYY-MM-DD' or parseable format
+      date: item.date,
       count: item.count,
     })
   );
@@ -140,7 +126,7 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
       case 'positive': return <ThumbsUp className="mr-2 h-5 w-5 text-green-500" />;
       case 'neutral':  return <Meh className="mr-2 h-5 w-5 text-slate-500" />;
       case 'critical': return <MessageSquareText className="mr-2 h-5 w-5 text-blue-500" />;
-      case 'toxic':    return <ThumbsDown className="mr-2 h-5 w-5 text-red-500" />; // Changed from AlertTriangle
+      case 'toxic':    return <ThumbsDown className="mr-2 h-5 w-5 text-red-500" />;
       default:         return <Info className="mr-2 h-5 w-5 text-muted-foreground" />;
     }
   };
@@ -149,7 +135,7 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
     <div className="space-y-8">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <Link href="/history" legacyBehavior passHref>
+          <Link href="/history">
             <Button variant="outline" size="sm" className="mb-3 inline-flex items-center">
               <ChevronLeft className="mr-1.5 h-4 w-4" />
               Back to History
@@ -158,20 +144,12 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
           <h1 className="truncate text-2xl font-bold text-foreground sm:text-3xl" title={videoTitle}>
             Analysis: {videoTitle}
           </h1>
-          {/*
-            If channel title is available in analysisData (e.g., analysisData.channelTitle), display it.
-            Our AnalysisResult type doesn't explicitly have channelTitle, but videoTitle implies it might come from a videos join.
-            Let's assume it might be part of videoTitle or not available directly here unless fetched.
-          */}
-          {/* <p className="text-sm text-muted-foreground">Channel: {analysisData.videos?.channel_title || 'N/A'}</p> */}
           <p className="mt-1 text-xs text-muted-foreground">
             Analyzed on: {new Date(analysisData.analysisTimestamp).toLocaleString()} | Processed: {analysisData.totalCommentsAnalyzed} comments
           </p>
         </div>
-        {/* Future: "Re-analyze" button or other actions */}
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <div className="lg:col-span-2">
           <SentimentPieChart data={pieChartData} />
@@ -181,7 +159,6 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
         </div>
       </div>
 
-      {/* Sentiment Category Summaries Section */}
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="text-xl sm:text-2xl">Category Summaries</CardTitle>
