@@ -9,10 +9,10 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/Card';
-import { History as HistoryIcon, ListChecks, AlertTriangle, Youtube } from 'lucide-react'; // Added Youtube icon
+import { History as HistoryIcon, ListChecks, AlertTriangle, Youtube } from 'lucide-react';
 import type { Metadata } from 'next';
 import AnalysisHistoryList from '@/components/history/AnalysisHistoryList';
-import { fetchAnalysisHistory, type AnalysisHistoryItem } from '@/lib/api'; // Import the API function and type
+import { type AnalysisHistoryItem } from '@/lib/api'; // Import the type from lib/api
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 
@@ -21,46 +21,52 @@ export const metadata: Metadata = {
   description: 'Review your past YouTube video sentiment analyses on TubeInsight.',
 };
 
-// The AnalysisHistoryItemData type used by AnalysisHistoryList component
-// should align with the AnalysisHistoryItem type from api.ts.
-// For clarity, let's use the imported type or ensure they are compatible.
-// In AnalysisHistoryList.tsx, we defined AnalysisHistoryItemData, which should now
-// directly match the 'AnalysisHistoryItem' type from lib/api.ts.
-// Let's assume AnalysisHistoryListProps in AnalysisHistoryList.tsx uses:
-// interface AnalysisHistoryListProps {
-//   analyses: AnalysisHistoryItem[]; // Using the imported type
-//   isLoading?: boolean; // isLoading for the list itself, if parent fetches
-// }
+export const dynamic = 'force-dynamic'; // Ensure page is always dynamically rendered
 
 export default async function HistoryPage() {
-  // Although middleware handles primary auth, a check in Server Components is good practice.
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseServerClient(); 
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   if (!session) {
-    // Middleware should ideally redirect before this page component even runs.
     redirect('/login?next=/history');
   }
 
   let analyses: AnalysisHistoryItem[] = [];
   let fetchError: string | null = null;
-  // For Server Components, data fetching is done before rendering,
-  // so a distinct 'isLoading' prop for the page itself isn't managed the same way
-  // as client-side fetching. If fetchAnalysisHistory() is slow, the page will wait.
-  // The <AnalysisHistoryList isLoading={...}> prop is for its internal display if needed.
 
+  // --- Start of Data Fetching Logic (moved from lib/api.ts) ---
   try {
-    // Fetch analysis history using the API service function.
-    // This function handles including the auth token.
-    const historyData = await fetchAnalysisHistory(); // This is an async call
+    const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+    if (!backendApiUrl) {
+      throw new Error("Backend API URL is not configured.");
+    }
+    
+    const response = await fetch(`${backendApiUrl}/analyses`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store', // Always fetch fresh data for the history page
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+        throw new Error(errorData.message || 'Failed to fetch analysis history.');
+    }
+
+    const historyData = await response.json();
     analyses = historyData.analyses || [];
+
   } catch (error) {
     console.error('Error fetching analysis history on page:', error);
     fetchError = error instanceof Error ? error.message : 'Failed to load analysis history.';
-    analyses = []; // Ensure analyses is an empty array on error for the list component
+    analyses = [];
   }
+  // --- End of Data Fetching Logic ---
+
 
   return (
     <div className="space-y-6">
@@ -71,15 +77,14 @@ export default async function HistoryPage() {
             Analysis History
           </h1>
         </div>
-        <Link href="/analyze" legacyBehavior passHref>
-          <Button size="sm">
+        <Link href="/analyze">
+          <Button size="sm" className="flex items-center">
             <Youtube className="mr-2 h-4 w-4" />
             Analyze New Video
           </Button>
         </Link>
       </div>
 
-      {/* Display error message if fetching failed */}
       {fetchError && (
         <Card className="border-destructive bg-destructive/10 text-destructive dark:border-destructive/50 dark:bg-destructive/20">
           <CardHeader>
@@ -97,8 +102,6 @@ export default async function HistoryPage() {
         </Card>
       )}
 
-      {/* Render AnalysisHistoryList only if there was no initial fetch error */}
-      {/* The AnalysisHistoryList component itself will handle the "no analyses yet" case */}
       {!fetchError && (
         <Card className="shadow-lg">
           <CardHeader>
@@ -115,16 +118,7 @@ export default async function HistoryPage() {
               Review and revisit insights from your previously analyzed videos.
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-0 sm:p-0"> {/* Remove default padding if list items have their own */}
-            {/*
-              isLoading prop for AnalysisHistoryList:
-              Since this page is a Server Component, the data fetching for `analyses`
-              completes before the page is rendered. So, the main `isLoading` state
-              for the page's data is handled by Next.js during the server render.
-              The `AnalysisHistoryList` might have its own internal loading states if it were
-              to perform further client-side operations (like pagination, which we aren't doing yet).
-              For now, we can pass isLoading as false as the data is pre-fetched.
-            */}
+          <CardContent className="p-0 sm:p-0">
             <AnalysisHistoryList analyses={analyses} isLoading={false} />
           </CardContent>
         </Card>
