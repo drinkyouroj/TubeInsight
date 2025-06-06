@@ -17,53 +17,27 @@ import { fetchAnalysisDetails, type AnalysisResult } from '@/lib/api';
 import SentimentPieChart, { type SentimentPieChartDataPoint } from '@/components/charts/SentimentPieChart';
 import CommentsByDateBarChart, { type CommentsByDateDataPoint } from '@/components/charts/CommentsByDateBarChart';
 
-// This Next.js option can sometimes help with build issues on dynamic pages.
-// It forces the page to be rendered dynamically at request time.
-export const dynamic = 'force-dynamic';
-
-// Define the props for generateMetadata inline.
-type MetadataProps = {
-  params: { analysisId: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
-};
-
+// Define the props for generateMetadata inline and explicitly.
+// Temporarily removing async data fetching to isolate build error.
 export async function generateMetadata(
-  { params }: MetadataProps,
-  parent: ResolvingMetadata
+  { params }: { params: { analysisId: string } }
 ): Promise<Metadata> {
   const { analysisId } = params;
-  let pageTitle = 'Analysis Details';
-  let pageDescription = 'Detailed sentiment analysis results from TubeInsight.';
-
-  try {
-    const supabase = createSupabaseServerClient();
-     const { data: analysisMeta } = await supabase
-      .from('analyses')
-      .select('videos(video_title)')
-      .eq('analysis_id', analysisId)
-      .maybeSingle();
-
-    if (analysisMeta && analysisMeta.videos && analysisMeta.videos.video_title) {
-      pageTitle = `${analysisMeta.videos.video_title} - Analysis`;
-      pageDescription = `Sentiment analysis for "${analysisMeta.videos.video_title}". View detailed insights including sentiment breakdown, category summaries, and comment trends.`;
-    }
-  } catch (error) {
-    console.error("Error fetching video title for metadata:", error);
-  }
-
+  
+  // Return a static title for now as a debugging step.
+  // If the build succeeds with this change, we know the issue is related to
+  // the data fetching call within this function.
   return {
-    title: pageTitle,
-    description: pageDescription,
+    title: `Analysis: ${analysisId.substring(0, 8)}...`,
+    description: 'Detailed sentiment analysis results from TubeInsight.',
   };
 }
 
-// Define the props for the page component inline as well.
-type PageProps = {
+// Define the props for the page component inline and explicitly.
+export default async function AnalysisDetailPage({ params, searchParams }: {
   params: { analysisId: string };
   searchParams?: { [key: string]: string | string[] | undefined };
-};
-
-export default async function AnalysisDetailPage({ params }: PageProps) {
+}) {
   const { analysisId } = params;
 
   const supabase = createSupabaseServerClient();
