@@ -31,45 +31,60 @@ def get_or_create_video(video_id: str, video_title: str | None, channel_title: s
         The video record (dictionary) or None if an error occurs.
     """
     supabase = get_supabase_client()
+    current_app.logger.info(f"[get_or_create_video] Supabase client type: {type(supabase)}")
+    if hasattr(supabase, 'supabase_url'):
+        current_app.logger.info(f"[get_or_create_video] Supabase client URL: {supabase.supabase_url}")
+    else:
+        current_app.logger.warning("[get_or_create_video] Supabase client does not have supabase_url attribute.")
+
     try:
         # Check if video exists
-        response = supabase.table('videos').select('*').eq('youtube_video_id', video_id).maybe_single().execute()
+        current_app.logger.info(f"[get_or_create_video] Attempting to select video_id: {video_id}")
+        query_builder = supabase.table('videos').select('*').eq('youtube_video_id', video_id)
+        current_app.logger.info(f"[get_or_create_video] Query builder type: {type(query_builder)}")
+        response = query_builder.execute()
+        current_app.logger.info(f"[get_or_create_video] Raw response from execute(): {response}")
+        current_app.logger.info(f"[get_or_create_video] Raw response type from execute(): {type(response)}")
         
-        # Add a check if the response object itself is None
         if response is None:
-            current_app.logger.error(f"Supabase query for selecting video '{video_id}' returned None. This indicates a low-level client or connection issue.")
+            current_app.logger.error(f"Supabase query for selecting video '{video_id}' returned None unexpectedly. This indicates a low-level client or connection issue.")
             return None
 
-        if response.error:
-            current_app.logger.error(f"Error selecting video '{video_id}': {response.error.message}")
-            return None
+        # If execute() didn't raise an exception, the HTTP call was successful.
+        # We don't need to check response.error here.
+        # The content of response.data tells us if records were found.
             
         current_timestamp = datetime.now(timezone.utc).isoformat()
-
+        
+        existing_video_data = None
         if response.data:
+            if len(response.data) > 1:
+                current_app.logger.warning(f"Multiple records found for video_id '{video_id}'. Using the first one. Consider adding a unique constraint on youtube_video_id.")
+            existing_video_data = response.data[0]
+
+        if existing_video_data:
             # Video exists, update it
             update_data = {
-                'video_title': video_title if video_title is not None else response.data.get('video_title'),
-                'channel_title': channel_title if channel_title is not None else response.data.get('channel_title'),
+                'video_title': video_title if video_title is not None else existing_video_data.get('video_title'),
+                'channel_title': channel_title if channel_title is not None else existing_video_data.get('channel_title'),
                 'last_cached_comment_retrieval_timestamp': current_timestamp,
                 'updated_at': current_timestamp
             }
             update_response = supabase.table('videos').update(update_data).eq('youtube_video_id', video_id).execute()
             
             if update_response is None:
-                current_app.logger.error(f"Supabase query for updating video '{video_id}' returned None.")
-                return response.data # Fallback to originally selected data if update fails this way
+                current_app.logger.error(f"Supabase query for updating video '{video_id}' returned None unexpectedly.")
+                return existing_video_data # Fallback to originally selected data
             
-            if update_response.error:
-                current_app.logger.error(f"Failed to update video '{video_id}': {update_response.error.message}")
-                return response.data 
+            # If execute() on update didn't raise, the HTTP call was successful.
+            # We don't need to check update_response.error.
             
             if update_response.data: 
                 current_app.logger.info(f"Updated video '{video_id}' in database.")
                 return update_response.data[0]
             else: 
                 current_app.logger.warning(f"Video '{video_id}' update reported no error, but no data returned. Using original selection.")
-                return response.data 
+                return existing_video_data 
         else:
             # Video does not exist, create it
             insert_data = {
@@ -85,11 +100,10 @@ def get_or_create_video(video_id: str, video_title: str | None, channel_title: s
             if create_response is None:
                 current_app.logger.error(f"Supabase query for creating video '{video_id}' returned None.")
                 return None
-
-            if create_response.error:
-                current_app.logger.error(f"Failed to create video '{video_id}': {create_response.error.message}")
-                return None
             
+            # If execute() on insert didn't raise, the HTTP call was successful.
+            # We don't need to check create_response.error.
+
             if create_response.data: 
                 current_app.logger.info(f"Created new video '{video_id}' in database.")
                 return create_response.data[0]
@@ -98,7 +112,9 @@ def get_or_create_video(video_id: str, video_title: str | None, channel_title: s
                 return None
 
     except Exception as e:
-        current_app.logger.exception(f"Exception in get_or_create_video for '{video_id}': {e}")
+        current_app.logger.error(f"Exception in get_or_create_video for '{video_id}': {e}")
+        import traceback
+        current_app.logger.error(traceback.format_exc())
         return None
 
 # --- Comment related functions ---
@@ -139,13 +155,14 @@ def save_comments_batch(video_id: str, comments: list[dict]) -> bool:
         if response is None:
             current_app.logger.error(f"Supabase query for upserting comments for video '{video_id}' returned None.")
             return False
-
-        if response.error:
-            current_app.logger.error(f"Error saving comments for video '{video_id}': {response.error.message}")
-            return False
         
-        current_app.logger.info(f"Successfully saved/updated {len(comments_to_save)} comments for video '{video_id}'.")
-        return True
+        if response.data:
+            current_app.logger.info(f"Successfully saved/updated {len(comments_to_save)} comments for video '{video_id}'.")
+            return True
+        else:
+            current_app.logger.error(f"Comments upsert for video '{video_id}' reported no error, but no data returned.")
+            return False
+
     except Exception as e:
         current_app.logger.exception(f"Exception while saving comments for video '{video_id}': {e}")
         return False
@@ -169,35 +186,31 @@ def save_analysis_results(user_id: str, video_id: str, total_comments_analyzed: 
             current_app.logger.error(f"Supabase query for inserting analysis for user '{user_id}', video '{video_id}' returned None.")
             return None
         
-        if analysis_response.error or not analysis_response.data:
-            err_msg = analysis_response.error.message if analysis_response.error else "No data returned"
-            current_app.logger.error(f"Failed to save main analysis record for user '{user_id}', video '{video_id}': {err_msg}")
-            return None
-        
-        analysis_id = analysis_response.data[0]['analysis_id']
-        current_app.logger.info(f"Saved main analysis record with ID '{analysis_id}'.")
+        if analysis_response.data:
+            analysis_id = analysis_response.data[0]['analysis_id']
+            current_app.logger.info(f"Saved main analysis record with ID '{analysis_id}'.")
 
-        summaries_to_save = []
-        for item in sentiment_breakdown:
-            summaries_to_save.append({
-                'analysis_id': analysis_id,
-                'category_name': item['category'],
-                'comment_count_in_category': item['count'],
-                'summary_text': item['summary']
-            })
-        
-        if summaries_to_save:
-            summaries_response = supabase.table('analysis_category_summaries').insert(summaries_to_save).execute()
+            summaries_to_save = []
+            for item in sentiment_breakdown:
+                summaries_to_save.append({
+                    'analysis_id': analysis_id,
+                    'category_name': item['category'],
+                    'comment_count_in_category': item['count'],
+                    'summary_text': item['summary']
+                })
             
-            if summaries_response is None:
-                current_app.logger.error(f"Supabase query for inserting summaries for analysis_id '{analysis_id}' returned None.")
-                # Potentially roll back, for now just log
-            elif summaries_response.error:
-                current_app.logger.error(f"Failed to save category summaries for analysis_id '{analysis_id}': {summaries_response.error.message}")
-            else:
-                current_app.logger.info(f"Saved {len(summaries_to_save)} category summaries for analysis_id '{analysis_id}'.")
-        
-        return analysis_id
+            if summaries_to_save:
+                summaries_response = supabase.table('analysis_category_summaries').insert(summaries_to_save).execute()
+                
+                if summaries_response is None:
+                    current_app.logger.error(f"Supabase query for inserting summaries for analysis_id '{analysis_id}' returned None.")
+                    # Potentially roll back, for now just log
+                elif not summaries_response.data:
+                    current_app.logger.error(f"Failed to save category summaries for analysis_id '{analysis_id}'.")
+                else:
+                    current_app.logger.info(f"Saved {len(summaries_to_save)} category summaries for analysis_id '{analysis_id}'.")
+            
+            return analysis_id
 
     except Exception as e:
         current_app.logger.exception(f"Error in save_analysis_results for user '{user_id}', video '{video_id}': {e}")
@@ -219,10 +232,6 @@ def get_user_analyses_history(user_id: str, limit: int = 20, offset: int = 0) ->
         
         if response is None:
             current_app.logger.error(f"Supabase query for fetching history for user '{user_id}' returned None.")
-            return None
-
-        if response.error:
-            current_app.logger.error(f"Error fetching analysis history for user '{user_id}': {response.error.message}")
             return None
         
         return response.data if response.data is not None else [] 
@@ -254,13 +263,7 @@ def get_analysis_detail_by_id(analysis_id: str, user_id: str) -> dict | None:
         if response is None:
             current_app.logger.error(f"Supabase query for fetching analysis details for analysis_id '{analysis_id}' returned None.")
             return None
-
-        if response.error:
-            current_app.logger.error(f"Error fetching details for analysis_id '{analysis_id}': {response.error.message}")
-            return None
         
-        if not response.data:
-             current_app.logger.warning(f"Analysis_id '{analysis_id}' not found for user '{user_id}'.")
         return response.data 
 
     except Exception as e:
@@ -282,10 +285,6 @@ def get_comments_by_date_for_video(video_id: str, days_limit: int = 30) -> list[
         if response is None:
             current_app.logger.error(f"Supabase query for fetching comments for date aggregation (video_id: {video_id}) returned None.")
             return []
-
-        if response.error:
-            current_app.logger.error(f"Error fetching comments for date aggregation (video_id: {video_id}): {response.error.message}")
-            return [] 
 
         if not response.data:
             return []
