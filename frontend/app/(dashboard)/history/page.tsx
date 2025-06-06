@@ -59,18 +59,28 @@ export default async function HistoryPage() {
 
     const historyData = await response.json();
     
+    // Log the raw API response to see the exact format of IDs
+    console.log("Raw API response - first analysis sample:", 
+                historyData.analyses && historyData.analyses.length > 0 
+                ? historyData.analyses[0] 
+                : "No analyses");
+    
     // Transform backend API response to match what AnalysisHistoryList expects
-    analyses = historyData.analyses?.map((analysis: any) => ({
-      analysisId: analysis.id,
-      videoId: analysis.youtube_video_id,
-      analysisTimestamp: analysis.created_at,
-      totalCommentsAnalyzed: analysis.total_comments_analyzed,
-      videoTitle: analysis.video_title || `Video: ${analysis.youtube_video_id}`
-    })) || [];
+    analyses = historyData.analyses?.map((analysis: any) => {
+      console.log(`Analysis object ID fields: id=${analysis.id}, analysis_id=${analysis.analysis_id}`);
+      
+      return {
+        analysisId: analysis.id || analysis.analysis_id, // Try to be flexible with ID field naming
+        videoId: analysis.youtube_video_id,
+        analysisTimestamp: analysis.created_at,
+        totalCommentsAnalyzed: analysis.total_comments_analyzed,
+        videoTitle: analysis.video_title || `Video: ${analysis.youtube_video_id}`
+      };
+    }) || [];
     
     // Add logging to help debug issues
-    console.log("Original API response:", historyData);
     console.log("Transformed analyses:", analyses);
+    console.log("Original API response:", historyData);
 
   } catch (error) {
     console.error('Error fetching analysis history on page:', error);

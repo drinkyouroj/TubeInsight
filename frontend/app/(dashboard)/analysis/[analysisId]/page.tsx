@@ -54,7 +54,10 @@ type PageProps = {
 };
 
 export default async function AnalysisDetailPage({ params }: PageProps) {
-  const { analysisId } = params;
+  const analysisId = params.analysisId;
+  
+  // Add debugging for the analysisId
+  console.log(`Analysis detail page - Requested analysisId: ${analysisId}`);
 
   const supabase = createSupabaseServerClient();
   const {
@@ -85,6 +88,9 @@ export default async function AnalysisDetailPage({ params }: PageProps) {
       // Important for Server Components making fetch calls
       cache: 'no-store', 
     });
+    
+    // Log the requested URL
+    console.log(`Making API request to: ${backendApiUrl}/analyses/${analysisId}`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
