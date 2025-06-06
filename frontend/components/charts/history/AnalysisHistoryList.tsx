@@ -26,13 +26,11 @@ import {
 // This type should ideally be defined in a shared types file or directly in the page component
 // and then imported here. For simplicity, it's duplicated from history/page.tsx discussion.
 export interface AnalysisHistoryItemData {
-  analysisId: string; // Supabase UUID
-  youtube_video_id: string; // from 'analyses' table, matching 'videos' table
-  analysis_timestamp: string; // ISO string from 'analyses' table
-  total_comments_analyzed: number; // from 'analyses' table
-  videos?: { // Joined data from 'videos' table
-    video_title: string | null;
-  } | null; // It could be null if the join didn't find a video (unlikely with proper FKs)
+  analysisId: string; 
+  videoId: string; 
+  analysisTimestamp: string; 
+  totalCommentsAnalyzed: number; 
+  videoTitle?: string; 
   // Optional: Add overall sentiment summary if fetched
   // overall_sentiment_summary?: string; // e.g., "Mostly Positive"
 }
@@ -134,22 +132,22 @@ export default function AnalysisHistoryList({
           <CardHeader className="pb-3">
             <CardTitle
               className="truncate text-lg font-semibold text-foreground hover:text-primary sm:text-xl"
-              title={analysis.videos?.video_title || 'Untitled Video'}
+              title={analysis.videoTitle || 'Untitled Video'}
             >
               <Link href={`/analysis/${analysis.analysisId}`} legacyBehavior>
                 <a className="hover:underline">
-                  {analysis.videos?.video_title || `Analysis for Video ID: ${analysis.youtube_video_id}`}
+                  {analysis.videoTitle || `Analysis for Video ID: ${analysis.videoId}`}
                 </a>
               </Link>
             </CardTitle>
             <CardDescription className="flex items-center text-xs text-muted-foreground">
               <CalendarDays className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" />
-              Analyzed: {formatDate(analysis.analysis_timestamp)}
+              Analyzed: {formatDate(analysis.analysisTimestamp)}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 pb-4 pt-0">
             <p className="text-sm text-muted-foreground">
-              Comments Processed: <span className="font-medium text-foreground">{analysis.total_comments_analyzed}</span>
+              Comments Processed: <span className="font-medium text-foreground">{analysis.totalCommentsAnalyzed}</span>
             </p>
             {getOverallSentimentDisplay(analysis)}
           </CardContent>

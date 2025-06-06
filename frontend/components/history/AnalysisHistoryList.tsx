@@ -21,12 +21,10 @@ import {
 // This type should align with what the history page fetches and passes down.
 export interface AnalysisHistoryItemData {
   analysisId: string;
-  youtube_video_id: string;
-  analysis_timestamp: string;
-  total_comments_analyzed: number;
-  videos?: { // Data from the joined 'videos' table
-    video_title: string | null;
-  } | null;
+  videoId: string; // Changed from youtube_video_id
+  analysisTimestamp: string; // Changed from analysis_timestamp (camelCase)
+  totalCommentsAnalyzed: number; // Changed from total_comments_analyzed (camelCase)
+  videoTitle?: string | null; // Changed from nested videos.video_title, made optional and nullable
 }
 
 interface AnalysisHistoryListProps {
@@ -55,40 +53,27 @@ export default function AnalysisHistoryList({
   isLoading = false,
 }: AnalysisHistoryListProps) {
   if (isLoading) {
-    // Skeleton loading state
     return (
-      <div className="space-y-4 p-4 sm:p-6">
-        {[...Array(3)].map((_, index) => (
-          <Card key={index} className="animate-pulse">
-            <CardHeader className="pb-3">
-              <div className="mb-1 h-5 w-3/4 rounded bg-muted sm:h-6"></div> {/* Title */}
-              <div className="h-3 w-1/2 rounded bg-muted sm:h-4"></div> {/* Date */}
-            </CardHeader>
-            <CardContent className="space-y-1 pb-4 pt-0">
-              <div className="h-3 w-1/3 rounded bg-muted sm:h-4"></div> {/* Comments processed */}
-            </CardContent>
-            <CardFooter className="border-t border-border px-6 py-3">
-              <div className="ml-auto h-8 w-28 rounded-md bg-muted sm:h-9"></div> {/* Button */}
-            </CardFooter>
-          </Card>
-        ))}
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-muted-foreground">Loading analysis history...</p>
       </div>
     );
   }
 
-  if (!analyses || analyses.length === 0) {
+  if (analyses.length === 0) {
     return (
-      <div className="py-10 text-center">
-        <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-        <h3 className="text-xl font-semibold text-foreground">
-          No Analysis History Found
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
+        <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
+        <h3 className="mb-2 text-xl font-semibold text-foreground">
+          No Analyses Yet
         </h3>
-        <p className="mt-2 text-muted-foreground">
-          You haven&apos;t analyzed any videos yet. Why not start now?
+        <p className="mb-4 text-sm text-muted-foreground">
+          You haven't analyzed any videos. Start by analyzing a video.
         </p>
-        <Link href="/analyze" legacyBehavior={false}>
-          <Button className="mt-6">
-            <Youtube className="mr-2 h-4 w-4" /> Analyze Your First Video
+        <Link href="/analyze" legacyBehavior passHref>
+          <Button size="sm">
+            <Youtube className="mr-2 h-4 w-4" />
+            Analyze Your First Video
           </Button>
         </Link>
       </div>
@@ -96,37 +81,42 @@ export default function AnalysisHistoryList({
   }
 
   return (
-    <div className="space-y-4 p-0 sm:p-0"> {/* Padding is handled by the parent Card's content area */}
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {analyses.map((analysis) => (
-        <div key={analysis.analysisId} className="border-b border-border last:border-b-0">
-          <div className="flex items-center justify-between p-4 transition-colors hover:bg-muted/50">
-            <div className="flex-1 space-y-1 overflow-hidden">
-              <Link
-                href={`/analysis/${analysis.analysisId}`}
-                className="group font-semibold text-foreground"
-              >
-                <p className="truncate group-hover:underline" title={analysis.videos?.video_title || 'Untitled Video'}>
-                  {analysis.videos?.video_title || `Analysis: ${analysis.analysisId.substring(0,8)}...`}
-                </p>
+        <Card key={analysis.analysisId} className="flex h-full flex-col overflow-hidden shadow-sm transition-shadow hover:shadow-md">
+          <CardHeader className="pb-3">
+            <CardTitle
+              className="truncate text-lg font-semibold text-foreground hover:text-primary sm:text-xl"
+              title={analysis.videoTitle || 'Untitled Video'} // Use direct videoTitle
+            >
+              <Link href={`/analysis/${analysis.analysisId}`} legacyBehavior>
+                <a className="hover:underline">
+                  {analysis.videoTitle || `Analysis for Video ID: ${analysis.videoId}`} {/* Use direct videoTitle and videoId */}
+                </a>
               </Link>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <div className="flex items-center">
-                  <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-                  <span>{formatDate(analysis.analysis_timestamp)}</span>
-                </div>
-                <div className="flex items-center">
-                  <FileText className="mr-1.5 h-3.5 w-3.5" />
-                  <span>{analysis.total_comments_analyzed} comments</span>
-                </div>
-              </div>
-            </div>
-            <Link href={`/analysis/${analysis.analysisId}`} legacyBehavior={false}>
-              <Button variant="ghost" size="icon">
-                <ChevronRight className="h-4 w-4" />
+            </CardTitle>
+            <CardDescription className="flex items-center text-xs text-muted-foreground">
+              <CalendarDays className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" />
+              Analyzed: {formatDate(analysis.analysisTimestamp)} {/* Use analysisTimestamp */}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex-grow space-y-2 pb-4 pt-0">
+            <p className="text-sm text-muted-foreground">
+              <FileText className="mr-1.5 inline-block h-4 w-4 align-text-bottom" />
+              Comments Processed: <span className="font-medium text-foreground">{analysis.totalCommentsAnalyzed}</span> {/* Use totalCommentsAnalyzed */}
+            </p>
+            {/* Placeholder for overall sentiment - adapt if you have this data */}
+            {/* <p className="text-sm text-muted-foreground">Overall: <span className="font-medium text-green-600">Positive</span></p> */}
+          </CardContent>
+          <CardFooter className="mt-auto border-t bg-muted/30 px-4 py-3">
+            <Link href={`/analysis/${analysis.analysisId}`} legacyBehavior passHref>
+              <Button variant="ghost" size="sm" className="w-full justify-center text-sm">
+                View Details
+                <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
-          </div>
-        </div>
+          </CardFooter>
+        </Card>
       ))}
     </div>
   );
