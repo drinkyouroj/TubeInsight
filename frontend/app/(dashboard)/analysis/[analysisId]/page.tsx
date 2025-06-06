@@ -11,33 +11,52 @@ import {
 } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { BarChart3, PieChart, MessageSquareText, AlertTriangleIcon as AlertTriangle, CheckCircle, ThumbsUp, ThumbsDown, Meh, Info, ChevronLeft } from 'lucide-react';
+import { BarChart3, PieChart, MessageSquareText, AlertTriangleIcon as AlertTriangle, ThumbsUp, ThumbsDown, Meh, Info, ChevronLeft } from 'lucide-react';
 import type { Metadata, ResolvingMetadata } from 'next';
 import { fetchAnalysisDetails, type AnalysisResult } from '@/lib/api';
 import SentimentPieChart, { type SentimentPieChartDataPoint } from '@/components/charts/SentimentPieChart';
 import CommentsByDateBarChart, { type CommentsByDateDataPoint } from '@/components/charts/CommentsByDateBarChart';
 
-// Define the props for generateMetadata inline and explicitly.
-// Temporarily removing async data fetching to isolate build error.
+// Define the type for the props passed to the page and metadata function
+type PageProps = {
+  params: { analysisId: string };
+  searchParams?: { [key: string]: string | string[] | undefined };
+};
+
+// generateMetadata function using the shared Props type
 export async function generateMetadata(
-  { params }: { params: { analysisId: string } }
+  { params }: PageProps,
+  parent: ResolvingMetadata
 ): Promise<Metadata> {
   const { analysisId } = params;
-  
-  // Return a static title for now as a debugging step.
-  // If the build succeeds with this change, we know the issue is related to
-  // the data fetching call within this function.
+  let pageTitle = 'Analysis Details';
+  let pageDescription = 'Detailed sentiment analysis results from TubeInsight.';
+
+  try {
+    // This fetch is for metadata only and should be very lightweight.
+    const supabase = createSupabaseServerClient();
+    const { data: analysisMeta } = await supabase
+      .from('analyses')
+      .select('videos(video_title)')
+      .eq('analysis_id', analysisId)
+      .maybeSingle();
+
+    if (analysisMeta?.videos?.video_title) {
+      pageTitle = `${analysisMeta.videos.video_title} - Analysis`;
+      pageDescription = `Sentiment analysis for "${analysisMeta.videos.video_title}". View detailed insights.`;
+    }
+  } catch (error) {
+    console.error("Error fetching video title for metadata:", error);
+  }
+
   return {
-    title: `Analysis: ${analysisId.substring(0, 8)}...`,
-    description: 'Detailed sentiment analysis results from TubeInsight.',
+    title: pageTitle,
+    description: pageDescription,
   };
 }
 
-// Define the props for the page component inline and explicitly.
-export default async function AnalysisDetailPage({ params, searchParams }: {
-  params: { analysisId: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}) {
+// Main page component with all logic self-contained
+export default async function AnalysisDetailPage({ params }: PageProps) {
   const { analysisId } = params;
 
   const supabase = createSupabaseServerClient();
@@ -64,7 +83,7 @@ export default async function AnalysisDetailPage({ params, searchParams }: {
       <div className="container mx-auto flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center space-y-4 p-4 text-center">
         <AlertTriangle className="h-16 w-16 text-destructive" />
         <h2 className="text-2xl font-semibold text-foreground">
-          {fetchError && fetchError.toLowerCase().includes('not found') ? 'Analysis Not Found' : 'Error Loading Analysis'}
+          {fetchError?.toLowerCase().includes('not found') ? 'Analysis Not Found' : 'Error Loading Analysis'}
         </h2>
         <p className="text-muted-foreground">
           {fetchError || 'The analysis you are looking for could not be loaded, or you do not have permission to view it.'}
@@ -141,7 +160,7 @@ export default async function AnalysisDetailPage({ params, searchParams }: {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {analysisData.sentimentBreakdown && analysisData.sentimentBreakdown.length > 0 ? (
+          {analysisData.sentimentBreakdown.length > 0 ? (
             analysisData.sentimentBreakdown.map((summaryItem) => (
               <Card key={summaryItem.category} className="bg-card/50 dark:bg-slate-900/70">
                 <CardHeader className="pb-2">
