@@ -142,7 +142,7 @@ export default async function AnalysisDetailPage({ params }: PageProps) {
     })
   );
 
-  const videoTitle = analysisData.videoTitle || 'Untitled Video';
+  const videoTitle = analysisData.videos?.video_title || 'Untitled Video';
 
   const getSentimentIcon = (categoryName: string) => {
     switch (categoryName.toLowerCase()) {
@@ -168,7 +168,7 @@ export default async function AnalysisDetailPage({ params }: PageProps) {
             Analysis: {videoTitle}
           </h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            Analyzed on: {new Date(analysisData.analysisTimestamp).toLocaleString()} | Processed: {analysisData.totalCommentsAnalyzed} comments
+            Analyzed on: {new Date(analysisData.analysis_timestamp).toLocaleString()} | Processed: {analysisData.total_comments_analyzed} comments
           </p>
         </div>
       </div>

@@ -58,7 +58,19 @@ export default async function HistoryPage() {
     }
 
     const historyData = await response.json();
-    analyses = historyData.analyses || [];
+    
+    // Transform backend API response to match what AnalysisHistoryList expects
+    analyses = historyData.analyses?.map((analysis: any) => ({
+      analysisId: analysis.id,
+      videoId: analysis.youtube_video_id,
+      analysisTimestamp: analysis.created_at,
+      totalCommentsAnalyzed: analysis.total_comments_analyzed,
+      videoTitle: analysis.video_title || `Video: ${analysis.youtube_video_id}`
+    })) || [];
+    
+    // Add logging to help debug issues
+    console.log("Original API response:", historyData);
+    console.log("Transformed analyses:", analyses);
 
   } catch (error) {
     console.error('Error fetching analysis history on page:', error);
