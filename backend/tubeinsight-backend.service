@@ -1,0 +1,13 @@
+[Unit]
+Description=Gunicorn instance to serve TubeInsight backend
+After=network.target
+
+[Service]
+User=your_username # Replace with the user running the app
+Group=www-data # Or your user's group
+WorkingDirectory=/home/your_username/TubeInsight/backend
+Environment="PATH=/home/your_username/TubeInsight/backend/venv/bin"
+ExecStart=/home/your_username/TubeInsight/backend/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 "tubeinsight_app:create_app()"
+
+[Install]
+WantedBy=multi-user.target
