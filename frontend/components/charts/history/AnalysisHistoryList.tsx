@@ -21,6 +21,7 @@ import {
   ThumbsDown,
   HelpCircle,
   Loader2, // For loading state
+  Youtube, // Added Youtube icon
 } from 'lucide-react';
 
 // This type should ideally be defined in a shared types file or directly in the page component

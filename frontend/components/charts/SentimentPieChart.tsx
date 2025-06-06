@@ -80,7 +80,7 @@ const renderActiveShape = (props: any) => {
   const { cx, cy, midAngle, innerRadius = 0, outerRadius = 0, startAngle, endAngle, fill, payload, percent, value } = props as any;
 
   if (cx === undefined || cy === undefined || midAngle === undefined || innerRadius === undefined || outerRadius === undefined || startAngle === undefined || endAngle === undefined || fill === undefined || payload === undefined || percent === undefined || value === undefined) {
-    return null; // Or some fallback rendering
+    return <g />; // Return an empty group instead of null
   }
 
   const sin = Math.sin(-RADIAN * midAngle);
