@@ -86,19 +86,17 @@ def classify_comment_sentiments_batch(comments: list[dict]) -> list[dict] | None
             return None
             
         # The response should be a JSON string representing a list of objects.
-        # Example: "{ \"classifications\": [{\"id\": \"id1\", \"category\": \"Positive\"}, ...] }"
-        # We need to parse this carefully.
         import json
-        # Assuming the model returns a JSON object with a key like "classifications" that holds the array.
-        # Adjust based on actual model output and prompt tuning.
-        # If the prompt guarantees the root is an array, direct parsing is fine.
         
-        # If the model is prompted to return a JSON string that is directly an array:
-        # classified_results = json.loads(response_content)
-        
-        # If the model returns a JSON object containing the array (safer):
         response_json = json.loads(response_content)
-        classified_results = response_json.get("classifications") # Or whatever key you instruct the model to use
+        
+        # Check for various possible keys that the API might return
+        # First check for 'result' key which is what the API is currently returning
+        classified_results = response_json.get("result")
+        
+        # If 'result' isn't found, try the previously expected 'classifications' key
+        if classified_results is None:
+            classified_results = response_json.get("classifications")
         
         if not isinstance(classified_results, list):
             current_app.logger.error(f"OpenAI sentiment classification did not return a list. Response: {response_content}")
