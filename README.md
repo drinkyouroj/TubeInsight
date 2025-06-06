@@ -209,10 +209,46 @@ What "test environment" means can vary:
 
 This setup provides a robust environment for developing and testing TubeInsight locally. As you progress, you can introduce more formal automated testing strategies.
 
-TubeInsight: Production Setup GuideThis guide outlines how to configure your Next.js frontend and Flask backend to run on a single server, using Nginx as a reverse proxy. This setup is robust, scalable, and eliminates CORS issues.High-Level ArchitecturePublic Traffic (Port 80/443) -> Nginx (Reverse Proxy)Nginx routes requests:Requests to /api/* are sent to the Flask/Gunicorn application (e.g., running on localhost:5000).All other requests (/, /history, /analyze, etc.) are sent to the Next.js application (e.g., running on localhost:3000).1. Preparing the Flask Backend for ProductionIn production, you should not use Flask's built-in development server. Use a production-grade WSGI server like Gunicorn.A. Add Gunicorn to requirements.txt:Ensure gunicorn is in your backend/requirements.txt:# ... other requirements
+## Production Setup Guide
+
+This guide outlines how to configure your Next.js frontend and Flask backend to run on a single server, using Nginx as a reverse proxy. This setup is robust, scalable, and eliminates CORS issues.
+
+### High-Level Architecture
+* **Public Traffic (Port 80/443) -> Nginx (Reverse Proxy)**
+* **Nginx** routes requests:
+    * Requests to `/api/*` are sent to the Flask/Gunicorn application (e.g., running on `localhost:5000`).
+    * All other requests (`/`, `/history`, `/analyze`, etc.) are sent to the **Next.js** application (e.g., running on `localhost:3000`).
+    
+### 1. Preparing the Flask Backend for Production
+In production, you should not use Flask's built-in development server. Use a production-grade WSGI server like **Gunicorn**.
+
+#### A. Add Gunicorn to `requirements.txt`:
+Ensure `gunicorn` is in your `backend/requirements.txt`:
+
+```
+# ... other requirements
 gunicorn>=20.0.0,<22.0.0
-Then run pip install -r requirements.txt in your virtual environment.B. Run with Gunicorn:Instead of flask run or python app.py, you'll use a command like this from your backend/ directory:gunicorn --workers 3 --bind 127.0.0.1:5000 "tubeinsight_app:create_app()"
---workers 3: A good starting point is (2 * number_of_cpu_cores) + 1. Adjust as needed.--bind 127.0.0.1:5000: Crucial. This binds Gunicorn to localhost on port 5000, meaning it's only accessible from within the server itself (by Nginx)."tubeinsight_app:create_app()": Tells Gunicorn to look inside the tubeinsight_app package for the create_app factory function and call it to get the Flask app instance.C. Manage with a Process Manager (e.g., systemd):To ensure your backend runs continuously and restarts on failure, create a systemd service file.Example backend/tubeinsight-backend.service:[Unit]
+```
+
+Then run `pip install -r requirements.txt` in your virtual environment.
+
+#### B. Run with Gunicorn:
+Instead of `flask run` or `python app.py`, you'll use a command like this from your `backend/` directory:
+
+```
+gunicorn --workers 3 --bind 127.0.0.1:5000 "tubeinsight_app:create_app()"
+```
+* --workers 3: A good starting point is `(2 * number_of_cpu_cores) + 1`. Adjust as needed.
+* `--bind 127.0.0.1:5000`: Crucial. This binds Gunicorn to localhost on port 5000, meaning it's only accessible from within the server itself (by Nginx).
+* `"tubeinsight_app:create_app()"`: Tells Gunicorn to look inside the `tubeinsight_app` package for the `create_app` factory function and call it to get the Flask app instance.
+
+#### C. Manage with a Process Manager (e.g., `systemd`):
+To ensure your backend runs continuously and restarts on failure, create a `systemd` service file.
+
+**Example `backend/tubeinsight-backend.service`:**
+
+```
+[Unit]
 Description=Gunicorn instance to serve TubeInsight backend
 After=network.target
 
@@ -225,9 +261,35 @@ ExecStart=/home/your_username/TubeInsight/backend/venv/bin/gunicorn --workers 3 
 
 [Install]
 WantedBy=multi-user.target
-Copy this file to /etc/systemd/system/, then run sudo systemctl daemon-reload, sudo systemctl start tubeinsight-backend, and sudo systemctl enable tubeinsight-backend.2. Preparing the Next.js Frontend for ProductionThe Next.js frontend also needs to be built for production and run with its optimized server.A. Build the Application:From your frontend/ directory, run the build command:npm run build
-This creates an optimized production build in the .next directory.B. Run the Production Server:Instead of npm run dev, you use npm run start. By default, it runs on port 3000. You can specify a different port and bind to localhost:npm start -- --hostname 127.0.0.1 --port 3000
-Binding to 127.0.0.1:3000 is important for the same reason as with Gunicorn: it should only be accessible locally by Nginx.C. Manage with a Process Manager (e.g., systemd):Create a service file for the frontend as well.Example frontend/tubeinsight-frontend.service:[Unit]
+```
+
+* Copy this file to `/etc/systemd/system/`, then run `sudo systemctl daemon-reload`, `sudo systemctl start tubeinsight-backend`, and `sudo systemctl enable tubeinsight-backend`.
+
+### 2. Preparing the Next.js Frontend for Production
+The Next.js frontend also needs to be built for production and run with its optimized server.
+
+#### A. Build the Application:
+From your `frontend/` directory, run the build command:
+```
+npm run build
+```
+
+This creates an optimized production build in the `.next` directory.
+
+#### B. Run the Production Server:
+Instead of `npm run dev`, you use `npm run start`. By default, it runs on port 3000. You can specify a different port and bind to localhost:
+```
+npm start -- --hostname 127.0.0.1 --port 3000
+```
+
+* Binding to `127.0.0.1:3000` is important for the same reason as with Gunicorn: it should only be accessible locally by Nginx.
+
+#### C. Manage with a Process Manager (e.g., `systemd`):
+Create a service file for the frontend as well.
+
+**Example `frontend/tubeinsight-frontend.service`:**
+```
+[Unit]
 Description=Next.js instance to serve TubeInsight frontend
 After=network.target
 
@@ -241,9 +303,21 @@ ExecStart=/usr/bin/npm start -- --hostname 127.0.0.1 --port 3000 # Use absolute 
 
 [Install]
 WantedBy=multi-user.target
-3. Configuring Nginx as a Reverse ProxyThis is the key that ties everything together.A. Install Nginx:sudo apt-get update
+```
+
+### 3. Configuring Nginx as a Reverse Proxy
+This is the key that ties everything together.
+
+#### A. Install Nginx:
+```
+sudo apt-get update
 sudo apt-get install nginx
-B. Create an Nginx Configuration File:Create a new config file, for example, /etc/nginx/sites-available/tubeinsight:server {
+```
+
+#### B. Create an Nginx Configuration File:
+Create a new config file, for example, `/etc/nginx/sites-available/tubeinsight:`
+```
+server {
     listen 80;
     listen [::]:80;
 
@@ -280,7 +354,11 @@ B. Create an Nginx Configuration File:Create a new config file, for example, /et
     # error_log /var/log/nginx/tubeinsight_error.log;
     # access_log /var/log/nginx/tubeinsight_access.log;
 }
-C. Enable the Site and Restart Nginx:# Create a symbolic link to enable the site
+```
+
+#### C. Enable the Site and Restart Nginx:
+```
+# Create a symbolic link to enable the site
 sudo ln -s /etc/nginx/sites-available/tubeinsight /etc/nginx/sites-enabled/
 
 # Test the Nginx configuration for syntax errors
@@ -288,7 +366,13 @@ sudo nginx -t
 
 # If the test is successful, restart Nginx to apply the changes
 sudo systemctl restart nginx
-4. Production Environment VariablesFinally, update your .env files for the production environment.backend/.env:FLASK_APP=app.py
+```
+
+### 4. Production Environment Variables
+Finally, update your `.env` files for the production environment.
+`backend/.env:`
+```
+FLASK_APP=app.py
 FLASK_ENV=production # Set to production
 FLASK_DEBUG=False    # Set to False
 FLASK_SECRET_KEY=your_very_strong_random_flask_secret_key # Must be set
@@ -301,7 +385,11 @@ YOUTUBE_API_KEY=...
 
 # This should be the public domain/IP of your server
 FRONTEND_URL=http://your_server_domain_or_ip
-frontend/.env.local:NEXT_PUBLIC_SUPABASE_URL=...
+```
+
+`frontend/.env.local:`
+```
+NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 
 # CRUCIAL CHANGE:
@@ -309,4 +397,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 # which Nginx will intercept and route to the backend.
 # No more localhost:5000! This is what solves CORS.
 NEXT_PUBLIC_BACKEND_API_URL=/api
+```
+
 With this setup, your application will be running in a robust, production-ready configuration on a single server.
