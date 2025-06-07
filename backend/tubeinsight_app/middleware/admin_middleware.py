@@ -49,7 +49,7 @@ def admin_required(min_role='super_admin'):
                 return f(*args, **kwargs)
             except Exception as e:
                 current_app.logger.error(f"Admin authentication error: {str(e)}")
-                return jsonify({'error': 'Authentication failed'}), 401
+                return jsonify({'error': 'Admin authentication failed', 'details': str(e)}), 500
                 
         return decorated_function
     return decorator

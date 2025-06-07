@@ -4,6 +4,16 @@ import { createServerClient as createMiddlewareClient, type CookieOptions } from
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  console.log(`[Middleware] Request for: ${pathname}`);
+
+  // If the request is for any /api/ path, log it and pass it through directly.
+  // This is a diagnostic step to see if middleware's Supabase logic interferes with API routes.
+  if (pathname.startsWith('/api/')) {
+    console.log(`[Middleware] API route ${pathname} detected. Bypassing Supabase logic in middleware and passing through.`);
+    return NextResponse.next(); 
+  }
+
   // Create an mutable response object by cloning the request headers
   // This allows us to set cookies on the response later.
   let response = NextResponse.next({
@@ -45,8 +55,6 @@ export async function middleware(request: NextRequest) {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-
-  const { pathname } = request.nextUrl;
 
   // Define protected routes.
   // These are routes that require authentication.
@@ -133,18 +141,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - auth/callback (Supabase OAuth callback route - we'll create this next)
-     * - api/ (if you had Next.js API routes - we are using Flask for the main API)
-     *
-     * This matcher pattern ensures that the middleware runs on relevant pages
-     * (like '/', '/login', '/analyze', etc.) but not on static assets or special routes.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|auth/callback|api/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|auth/callback).*)',
     '/admin/:path*',
     '/api/admin/:path*'
   ],
