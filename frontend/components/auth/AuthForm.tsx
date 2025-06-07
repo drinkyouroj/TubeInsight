@@ -182,14 +182,14 @@ export default function AuthForm() {
                   password_label: 'Password',
                   button_label: 'Sign In',
                   social_provider_text: 'Sign in with {{provider}}',
-                  link_text: "Don't have an account? Sign Up",
+                  link_text: "Already have an account? Sign In",
                 },
                 sign_up: {
                   email_label: 'Email address',
                   password_label: 'Create a password',
                   button_label: 'Sign Up',
                   social_provider_text: 'Sign up with {{provider}}',
-                  link_text: 'Already have an account? Sign In',
+                  link_text: "Don't have an account? Sign Up",
                 },
                 forgotten_password: {
                   email_label: 'Email address',
