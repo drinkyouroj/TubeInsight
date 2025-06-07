@@ -36,8 +36,8 @@ FOR ALL
 USING (
   -- Replace these UUIDs with actual admin user IDs from your system
   auth.uid() IN (
-    '00000000-0000-0000-0000-000000000000',  -- Replace with actual admin UUID
-    '11111111-1111-1111-1111-111111111111'   -- Replace with another admin UUID
+    '7d2dbb81-be17-4fa1-aa9e-8c1b78269153',  -- Replace with actual admin UUID
+    '8744a915-704f-424b-8fcd-4cd11a65080f'   -- Replace with another admin UUID
   )
 );
 
