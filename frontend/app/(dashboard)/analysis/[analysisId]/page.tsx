@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { BarChart3, PieChart, MessageSquareText, AlertTriangleIcon as AlertTriangle, ThumbsUp, ThumbsDown, Meh, Info, ChevronLeft } from 'lucide-react';
+import { BarChart3, PieChart, MessageSquareText, AlertTriangle, ThumbsUp, ThumbsDown, Meh, Info, ChevronLeft, Lock } from 'lucide-react';
 import type { Metadata, ResolvingMetadata } from 'next';
 // We are moving the fetch logic into this component, so we don't need fetchAnalysisDetails from lib/api.
 // We still need the AnalysisResult type.
@@ -95,20 +95,61 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
     console.log(`Making API request to: ${backendApiUrl}/analyses/${analysisId}`);
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
-      if (response.status === 404) {
-        throw new Error(errorData.message || 'Analysis not found.');
+      const errorData = await response.json().catch(() => ({ 
+        message: `HTTP error ${response.status}` 
+      }));
+
+      // Handle 403 Forbidden (user doesn't have access to this analysis)
+      if (response.status === 403) {
+        return (
+          <div className="container py-12">
+            <div className="mx-auto max-w-md rounded-lg border border-amber-200 bg-amber-50 p-8 text-center text-amber-800">
+              <Lock className="mx-auto mb-4 h-12 w-12" />
+              <h2 className="mb-2 text-2xl font-bold">Access Denied</h2>
+              <p className="mb-6">
+                {errorData.message || "You don't have permission to view this analysis."}
+              </p>
+              <Link href="/history">
+                <Button variant="outline" className="inline-flex items-center">
+                  <ChevronLeft className="mr-2 h-4 w-4" /> Back to Your Analyses
+                </Button>
+              </Link>
+            </div>
+          </div>
+        );
       }
+
+      // Handle 404 Not Found (analysis doesn't exist)
+      if (response.status === 404) {
+        return (
+          <div className="container py-12">
+            <div className="mx-auto max-w-md rounded-lg border border-destructive/20 bg-destructive/5 p-8 text-center text-destructive">
+              <AlertTriangle className="mx-auto mb-4 h-12 w-12" />
+              <h2 className="mb-2 text-2xl font-bold">Analysis Not Found</h2>
+              <p className="mb-6">
+                {errorData.message || "The analysis you're looking for doesn't exist or was removed."}
+              </p>
+              <Link href="/history">
+                <Button variant="outline" className="inline-flex items-center">
+                  <ChevronLeft className="mr-2 h-4 w-4" /> Back to Your Analyses
+                </Button>
+              </Link>
+            </div>
+          </div>
+        );
+      }
+
+      // For all other errors
       throw new Error(errorData.message || `Failed to fetch analysis details. Status: ${response.status}`);
     }
     
+    // If we get here, the request was successful
     analysisData = await response.json();
     console.log('--- BEGIN RAW ANALYSIS DATA ---');
     console.log(JSON.stringify(analysisData, null, 2));
     console.log('--- END RAW ANALYSIS DATA ---');
 
     // Transform API response to match frontend expected structure
-    // This handles both the old backend format and the new TypeScript interface format
     const transformedData = {
       ...analysisData,
       videoTitle: analysisData.videoTitle || analysisData.videos?.video_title || 'Untitled Video',
@@ -126,8 +167,23 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
     
   } catch (error: any) {
     console.error(`Error in AnalysisDetailPage for ID '${analysisId}':`, error);
-    // Ensure analysisData is null or an empty object if an error occurs before its usage
-    throw new Error(`Failed to load analysis: ${error.message}`);
+    // This is a catch-all for any other errors (network issues, etc.)
+    return (
+      <div className="container py-12">
+        <div className="mx-auto max-w-md rounded-lg border border-destructive/20 bg-destructive/5 p-8 text-center text-destructive">
+          <AlertTriangle className="mx-auto mb-4 h-12 w-12" />
+          <h2 className="mb-2 text-2xl font-bold">Error Loading Analysis</h2>
+          <p className="mb-6">
+            {error.message || 'An error occurred while loading the analysis. Please try again later.'}
+          </p>
+          <Link href="/history">
+            <Button variant="outline" className="inline-flex items-center">
+              <ChevronLeft className="mr-2 h-4 w-4" /> Back to Your Analyses
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   if (!analysisData) {

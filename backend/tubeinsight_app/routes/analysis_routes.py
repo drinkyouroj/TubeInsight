@@ -103,7 +103,7 @@ def get_analysis_details(current_supabase_user: SupabaseUser, analysis_id_from_p
 
         if analysis_details is None:
             current_app.logger.warning(f"Analysis '{analysis_id_from_path}' not found or access denied for user '{user_id}'.")
-            return jsonify({"error": "Analysis not found or access denied"}), 404
+            return jsonify({"error": "Analysis not found or access denied"}), 403
         
         youtube_video_id_for_comments = analysis_details.get('youtube_video_id')
         comments_by_date_data = []
