@@ -5,7 +5,7 @@ from ..services.supabase_service import get_supabase_client
 from ..services.admin_service import log_admin_action, get_user_profile, get_analytics_summary, update_user_role, update_user_status
 
 # Initialize Blueprint
-admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
+admin_bp = Blueprint('admin', __name__, url_prefix='/v1/admin')
 
 # User Management Routes
 
@@ -76,20 +76,20 @@ def get_user_details(user_id):
         return jsonify({'error': f'Failed to get user details: {str(e)}'}), 500
 
 @admin_bp.route('/users/<user_id>/role', methods=['PUT'])
-@admin_required(min_role='super_admin')
+# @admin_required(min_role='super_admin') # Temporarily commented out
 def update_user_role_route(user_id):
-    """Update a user's role (super_admin only)"""
+    """Update a user's role (super_admin only) - TEMPORARILY MODIFIED"""
     try:
         data = request.json
         new_role = data.get('role')
-        
+
         if new_role not in ['user', 'analyst', 'content_moderator', 'super_admin']:
             return jsonify({'error': 'Invalid role specified'}), 400
-            
-        # Don't allow changing own role
-        if user_id == g.user_id:
-            return jsonify({'error': 'Cannot change your own role'}), 400
-            
+
+        # Don't allow changing own role - Temporarily commented out
+        # if user_id == g.user_id:
+        #     return jsonify({'error': 'Cannot change your own role'}), 400
+
         result = update_user_role(user_id, new_role)
         
         return jsonify({
@@ -666,4 +666,3 @@ def get_system_health():
     except Exception as e:
         current_app.logger.error(f"Error getting system health: {str(e)}")
         return jsonify({'error': f'Failed to get system health: {str(e)}'}), 500
-

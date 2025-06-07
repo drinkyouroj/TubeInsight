@@ -95,6 +95,11 @@ export async function middleware(request: NextRequest) {
 
   // Admin route protection
   if (request.nextUrl.pathname.startsWith('/admin')) {
+    // Add this check to ensure session and session.user exist
+    if (!session || !session.user) {
+      // If no session or user, redirect to login, preserving the intended admin path
+      return NextResponse.redirect(new URL(`/login?redirect=${encodeURIComponent(request.nextUrl.pathname)}`, request.url));
+    }
     try {
       // Get user role from profiles
       const { data: profile, error } = await supabase

@@ -169,8 +169,11 @@ def create_app(config_name=None):
 
     # --- Register Blueprints (API Routes) ---
     from .routes.analysis_routes import analysis_bp
+    from .routes.admin_routes import admin_bp
     app.register_blueprint(analysis_bp) 
+    app.register_blueprint(admin_bp)
     app.logger.info("Analysis blueprint registered under /api.")
+    app.logger.info("Admin blueprint registered under /v1/admin.")
     
     # Restore original health check logic
     @app.route('/api/health', methods=['GET'])
