@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { createClient } from "@/lib/supabase/client";
 
 type User = {
   id: string;
@@ -15,9 +16,47 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const supabase = createClient();
 
   useEffect(() => {
-    setLoading(true);
+    const fetchUsers = async () => {
+      setLoading(true);
+      try {
+        // Get the current session
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+          throw new Error('Not authenticated');
+        }
+
+        const response = await fetch('/api/admin/users', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}` 
+          }
+        });
+
+        if (!reponse.ok) {
+          let errorText = "Failed to fetch users";
+          try {
+            const errorJson = await response.clone().json();
+            errorText = errorJson.error || JSON.stringify(errorJson);
+          } catch (jsonError) {
+            errorText = await response.text();
+          }
+          throw new Error(errorText);
+        }
+
+        const data = await response.json();
+        setUsers(data.users || data);
+        setError(null);
+        catch (err) {
+          setError(err.message);
+          console.error('Error fetching users:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
     fetch(`/api/admin/users`)
       .then(async (res) => {
         if (!res.ok) {
