@@ -30,18 +30,34 @@ export async function authFetch<T = any>(url: string, options: RequestInit = {})
     });
 
     if (!response.ok) {
-      // Try to parse as JSON first
+      // First get the response as text
+      const responseText = await response.text();
+      
+      // Try to parse as JSON
       try {
-        const errorData = await response.clone().json();
-        const errorMessage = errorData.error || JSON.stringify(errorData);
+        const errorData = JSON.parse(responseText);
+        // If we have an error property, use that as the message
+        const errorMessage = errorData.error || response.statusText || 'Request failed';
         const error = new Error(errorMessage);
         (error as any).status = response.status;
         (error as any).data = errorData;
+        console.error('API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url,
+          errorData
+        });
         throw error;
       } catch (jsonError) {
-        // If JSON parsing fails, get the raw text
-        const errorText = await response.text();
-        throw new Error(errorText || `Request failed with status ${response.status}`);
+        // If JSON parsing fails, use the raw text as the error message
+        const errorMessage = responseText || `Request failed with status ${response.status}`;
+        console.error('API Error (raw text):', {
+          status: response.status,
+          statusText: response.statusText,
+          url,
+          responseText
+        });
+        throw new Error(errorMessage);
       }
     }
 

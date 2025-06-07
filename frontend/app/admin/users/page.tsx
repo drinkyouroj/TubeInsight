@@ -1,19 +1,40 @@
-// frontend/app/admin/users/page.tsx
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/Button";
-import { authFetch } from "@/utils/api";
+import { createClient } from "@/lib/supabase/client";
 
-type User = {
+// Initialize Supabase client
+const supabase = createClient();
+
+type UserRole = 'user' | 'analyst' | 'content_moderator' | 'super_admin';
+type UserStatus = 'active' | 'suspended' | 'banned';
+
+interface User {
   id: string;
-  email?: string;  // Made optional to match UserProfile
+  email?: string | null;
   full_name?: string | null;
-  role: string;
-  status: string;
+  role: UserRole;
+  status: UserStatus;
   created_at: string;
   updated_at?: string;
-};
+}
+
+interface Pagination {
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+interface ApiResponse<T> {
+  data: T[];
+  pagination: Pagination;
+  error?: {
+    message: string;
+    code?: string;
+  };
+}
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -21,29 +42,6 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
-
-  // Define types for the API response
-  interface Pagination {
-    total: number;
-    page: number;
-    per_page: number;
-    total_pages: number;
-  }
-
-  interface ApiResponse<T> {
-    data: T;
-    pagination: Pagination;
-  }
-
-  interface UserProfile {
-    id: string;
-    email?: string;
-    full_name?: string | null;
-    role: string;
-    status: string;
-    created_at: string;
-    updated_at: string;
-  }
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -59,39 +57,50 @@ export default function AdminUsersPage() {
       params.append('page', '1');
       params.append('per_page', '20');
       
-      // Add filters if needed
-      // if (searchTerm) params.append('search', searchTerm);
-      // if (roleFilter) params.append('role', roleFilter);
-      
       url.search = params.toString();
       
       console.log('Fetching users from:', url.toString());
       
-      const response = await authFetch<ApiResponse<UserProfile[]>>(url.toString());
-      console.log('Fetched users data:', response);
+      const session = await supabase.auth.getSession();
+      if (!session.data.session) {
+        throw new Error('Not authenticated');
+      }
       
-      if (response && response.data) {
-        // Convert UserProfile[] to User[] by ensuring all required fields are present
-        const userData: User[] = response.data.map(profile => ({
-          id: profile.id,
-          email: profile.email || undefined,
-          full_name: profile.full_name || undefined,
-          role: profile.role,
-          status: profile.status,
-          created_at: profile.created_at,
-          updated_at: profile.updated_at
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${session.data.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch users: ${response.status} ${response.statusText}\n${errorText}`);
+      }
+      
+      const data: ApiResponse<User> = await response.json();
+      
+      // Debug log to see API response format
+      console.log('API response data:', JSON.stringify(data, null, 2));
+      
+      if (data && data.data) {
+        // Map response to ensure we have the email field
+        const usersWithFixedFields = data.data.map(user => ({
+          ...user,
+          // Make sure email is accessible
+          email: user.email || null
         }));
         
-        setUsers(userData);
-        setPagination(response.pagination);
+        setUsers(usersWithFixedFields);
+        setPagination(data.pagination);
       } else {
         setUsers([]);
         setError('No data returned from server');
       }
     } catch (err: any) {
-      const errorMessage = err?.data?.error || err?.message || 'Failed to fetch users';
-      setError(errorMessage);
       console.error('Error fetching users:', err);
+      const errorMessage = err?.message || 'Failed to load users';
+      setError(errorMessage);
       
       // If it's an authentication error, redirect to login
       if (err?.status === 401) {
@@ -102,43 +111,81 @@ export default function AdminUsersPage() {
     }
   }, []);
 
-  const updateUserRole = async (userId: string, newRole: string) => {
+  const updateUserAttribute = async (userId: string, attribute: string, newValue: string, displayName: string) => {
     try {
-      setUpdating(prev => ({ ...prev, [userId]: true }));
+      setUpdating(prev => ({ ...prev, [`${userId}-${attribute}`]: true }));
+      setError(null);
       
       const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
-      const url = `${baseUrl}/v1/admin/users/${userId}/role`;
+      const url = `${baseUrl}/v1/admin/users/${userId}/${attribute}`;
       
-      console.log(`Updating role for user ${userId} to ${newRole}`);
+      console.log(`Updating ${displayName} for user ${userId} to ${newValue}`, { url });
       
-      await authFetch(url, {
+      // Get fresh session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+      
+      // Log the token being used (first 10 chars only for security)
+      const tokenPreview = session.access_token.substring(0, 10) + '...';
+      console.log(`Using auth token starting with: ${tokenPreview}`);
+      
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ role: newRole }),
+        body: JSON.stringify({ [attribute]: newValue }),
       });
+
+      console.log(`${displayName} update response status: ${response.status}`);
       
-      // Show success message
-      setError(null);
+      // Get response as text first
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+      
+      // Try to parse as JSON if possible
+      let responseData;
+      try {
+        responseData = responseText ? JSON.parse(responseText) : {};
+        console.log('Parsed response data:', responseData);
+      } catch (parseErr) {
+        console.warn('Failed to parse response as JSON:', parseErr);
+        responseData = { raw: responseText };
+      }
+      
+      if (!response.ok) {
+        const errorMessage = responseData?.error?.message || 
+                            responseData?.message || 
+                            `Failed to update user ${displayName} (${response.status})`;
+        throw new Error(errorMessage);
+      }
+      
+      console.log(`${displayName} update successful`);
       
       // Refresh the user list
       await fetchUsers();
       
-      // Show success toast/notification
-      // You might want to use a proper toast/notification library
-      alert(`Successfully updated user role to ${newRole}`);
+      // Show success message
+      setError(null);
       
     } catch (err: any) {
-      const errorMessage = err?.data?.error || err?.message || 'Failed to update user role';
+      console.error(`Error updating user ${displayName}:`, err);
+      const errorMessage = err?.message || `Failed to update user ${displayName}`;
       setError(errorMessage);
-      console.error('Error updating user role:', err);
-      
-      // Show error toast/notification
-      alert(`Error: ${errorMessage}`);
     } finally {
-      setUpdating(prev => ({ ...prev, [userId]: false }));
+      setUpdating(prev => ({ ...prev, [`${userId}-${attribute}`]: false }));
     }
+  };
+  
+  const updateUserRole = (userId: string, newRole: UserRole) => {
+    return updateUserAttribute(userId, 'role', newRole, 'role');
+  };
+  
+  const updateUserStatus = (userId: string, newStatus: UserStatus) => {
+    return updateUserAttribute(userId, 'status', newStatus, 'status');
   };
 
   useEffect(() => {
@@ -215,7 +262,10 @@ export default function AdminUsersPage() {
                   <select
                     className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                     value={user.role}
-                    onChange={(e) => updateUserRole(user.id, e.target.value)}
+                    onChange={(e) => {
+                      const role = e.target.value as UserRole;
+                      updateUserRole(user.id, role);
+                    }}
                     disabled={updating[user.id]}
                   >
                     <option value="user">User</option>
@@ -225,15 +275,26 @@ export default function AdminUsersPage() {
                   </select>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                    ${user.status === 'active' ? 'bg-green-100 text-green-800' : 
-                      user.status === 'suspended' ? 'bg-yellow-100 text-yellow-800' : 
-                      'bg-red-100 text-red-800'}`}>
-                    {user.status}
-                  </span>
+                  <select
+                    className={`block w-full pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md
+                      ${user.status === 'active' ? 'bg-green-50 text-green-800' : 
+                        user.status === 'suspended' ? 'bg-yellow-50 text-yellow-800' : 
+                        'bg-red-50 text-red-800'}`}
+                    value={user.status}
+                    onChange={(e) => {
+                      const status = e.target.value as UserStatus;
+                      updateUserStatus(user.id, status);
+                    }}
+                    disabled={updating[`${user.id}-status`]}
+                  >
+                    <option value="active" className="bg-green-50 text-green-800">Active</option>
+                    <option value="suspended" className="bg-yellow-50 text-yellow-800">Suspended</option>
+                    <option value="banned" className="bg-red-50 text-red-800">Banned</option>
+                  </select>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {updating[user.id] ? 'Updating...' : ''}
+                  {updating[`${user.id}-role`] ? 'Updating role...' : ''}
+                  {updating[`${user.id}-status`] ? 'Updating status...' : ''}
                 </td>
               </tr>
             ))}
