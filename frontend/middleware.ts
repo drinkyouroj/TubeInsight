@@ -85,6 +85,48 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
+  // Admin route protection
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    try {
+      // Get user role from profiles
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      // Role hierarchy
+      const roleHierarchy: Record<string, number> = {
+        'user': 0,
+        'analyst': 1,
+        'content_moderator': 2,
+        'super_admin': 3
+      };
+
+      // Check role requirements based on URL pattern
+      let requiredRole = 'analyst'; // Default minimum role for admin area
+
+      // Special path-based requirements
+      if (request.nextUrl.pathname.startsWith('/admin/users')) {
+        requiredRole = 'super_admin';
+      } else if (request.nextUrl.pathname.startsWith('/admin/moderation')) {
+        requiredRole = 'content_moderator';
+      }
+
+      // Check if user has sufficient permissions
+      if (!profile || 
+          !profile.role || 
+          roleHierarchy[profile.role] < roleHierarchy[requiredRole]) {
+        // User doesn't have sufficient permissions, redirect to homepage
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+    } catch (error) {
+      console.error('Error checking user role:', error);
+      // If there's an error, we redirect to homepage for safety
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+  }
+
   // If none of the above conditions are met, proceed with the request.
   return response;
 }
@@ -103,5 +145,7 @@ export const config = {
      * (like '/', '/login', '/analyze', etc.) but not on static assets or special routes.
      */
     '/((?!_next/static|_next/image|favicon.ico|auth/callback|api/).*)',
+    '/admin/:path*',
+    '/api/admin/:path*'
   ],
 };
