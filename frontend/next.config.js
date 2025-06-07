@@ -5,6 +5,15 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
   },
+  // Configure path aliases
+  webpack: (config) => {
+    // This ensures that the path aliases in tsconfig.json are used by webpack
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': __dirname,
+    };
+    return config;
+  },
   // You can add other Next.js specific configurations here as your project grows.
   // For example:
   // images: {

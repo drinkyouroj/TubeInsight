@@ -73,3 +73,138 @@ def get_api_usage_stats(start_date=None, end_date=None):
         query = query.lte('created_at', end_date)
         
     return query.execute()
+
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+from supabase import Client
+from ..config import SUPABASE_URL, SUPABASE_SERVICE_KEY
+from ..exceptions import InvalidRoleError
+
+def get_supabase_client() -> Client:
+    from supabase import create_client
+    return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+def get_all_users(page: int = 1, per_page: int = 10, role_filter: Optional[str] = None, 
+                status_filter: Optional[str] = None, search: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Get paginated list of users with optional filtering
+    
+    Args:
+        page: Page number (1-based)
+        per_page: Number of items per page
+        role_filter: Filter by user role
+        status_filter: Filter by user status
+        search: Search term for email or name
+        
+    Returns:
+        Dictionary containing users and pagination info
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        # Base query
+        query = supabase.table('profiles').select('*', count='exact')
+        
+        # Apply filters
+        if role_filter:
+            query = query.eq('role', role_filter)
+        if status_filter:
+            query = query.eq('status', status_filter)
+        if search:
+            query = query.or_(f"email.ilike.%{search}%,full_name.ilike.%{search}%")
+            
+        # Add pagination
+        offset = (page - 1) * per_page
+        query = query.range(offset, offset + per_page - 1)
+        
+        # Execute query
+        response = query.execute()
+        
+        # Get total count for pagination
+        total_count = response.count if hasattr(response, 'count') else 0
+        
+        return {
+            'users': response.data if hasattr(response, 'data') else [],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total_count,
+                'total_pages': (total_count + per_page - 1) // per_page
+            }
+        }
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in get_all_users: {str(e)}")
+        raise
+
+def update_user_role(user_id: str, new_role: str) -> Dict[str, Any]:
+    """
+    Update a user's role
+    
+    Args:
+        user_id: ID of the user to update
+        new_role: New role to assign
+        
+    Returns:
+        Updated user data
+        
+    Raises:
+        InvalidRoleError: If the role is invalid
+        ValueError: If user is not found
+    """
+    valid_roles = ['user', 'analyst', 'content_moderator', 'super_admin']
+    if new_role not in valid_roles:
+        raise InvalidRoleError(f"Invalid role. Must be one of: {', '.join(valid_roles)}")
+    
+    try:
+        supabase = get_supabase_client()
+        
+        # Check if user exists
+        user = supabase.table('profiles').select('*').eq('id', user_id).execute()
+        if not user.data:
+            raise ValueError("User not found")
+            
+        # Update role
+        response = supabase.table('profiles')\
+            .update({'role': new_role, 'updated_at': datetime.utcnow().isoformat()})\
+            .eq('id', user_id)\
+            .execute()
+            
+        if not response.data:
+            raise ValueError("Failed to update user role")
+            
+        return response.data[0]
+        
+    except Exception as e:
+        current_app.logger.error(f"Error updating user role: {str(e)}")
+        raise
+
+def log_admin_action(admin_id: str, action: str, target_type: str, target_id: str, 
+                    details: Optional[Dict] = None) -> None:
+    """
+    Log an admin action for auditing
+    
+    Args:
+        admin_id: ID of the admin performing the action
+        action: Action performed (e.g., 'update_role', 'suspend_user')
+        target_type: Type of target (e.g., 'user', 'content')
+        target_id: ID of the target
+        details: Additional details about the action
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        log_entry = {
+            'admin_id': admin_id,
+            'action': action,
+            'target_type': target_type,
+            'target_id': target_id,
+            'details': details or {},
+            'ip_address': request.remote_addr if request else None,
+            'user_agent': request.headers.get('User-Agent') if request else None
+        }
+        
+        supabase.table('admin_audit_log').insert(log_entry).execute()
+        
+    except Exception as e:
+        current_app.logger.error(f"Failed to log admin action: {str(e)}")

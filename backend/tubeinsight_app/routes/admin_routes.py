@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, g, current_app
+from flask_jwt_extended import get_jwt_identity
 from datetime import datetime, timedelta
 from ..middleware.admin_middleware import admin_required
 from ..services.supabase_service import get_supabase_client
@@ -10,10 +11,16 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/v1/admin')
 # User Management Routes
 
 @admin_bp.route('/users', methods=['GET'])
-@admin_required(min_role='content_moderator')
+@admin_required(min_role='super_admin')
 def get_users():
-    """Get paginated list of users with filtering options"""
+    """Get paginated list of users with filtering options (admin only)"""
     try:
+        current_user = get_jwt_identity()
+
+        # Check if user has admin role
+        if current_user.get('role') != 'super_admin':
+            return jsonify({"error": "Insufficient permissions"}), 403
+
         # Parse query parameters
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 10))
@@ -59,6 +66,7 @@ def get_users():
     except Exception as e:
         current_app.logger.error(f"Error getting users: {str(e)}")
         return jsonify({'error': f'Failed to get users: {str(e)}'}), 500
+
 
 @admin_bp.route('/users/<user_id>', methods=['GET'])
 @admin_required(min_role='content_moderator')
