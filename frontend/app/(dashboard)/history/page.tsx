@@ -67,14 +67,19 @@ export default async function HistoryPage() {
     
     // Transform backend API response to match what AnalysisHistoryList expects
     analyses = historyData.analyses?.map((analysis: any) => {
-      console.log(`Analysis object ID fields: id=${analysis.id}, analysis_id=${analysis.analysis_id}`);
+      console.log('Analysis object:', analysis); // Log full object for debugging
+      
+      // Handle nested video title if it exists
+      const videoTitle = analysis.videos?.video_title || 
+                        analysis.video_title || 
+                        `Video: ${analysis.youtube_video_id}`;
       
       return {
-        analysisId: analysis.id || analysis.analysis_id, // Try to be flexible with ID field naming
+        analysisId: analysis.analysis_id || analysis.id, // Prefer analysis_id, fallback to id
         videoId: analysis.youtube_video_id,
-        analysisTimestamp: analysis.created_at,
-        totalCommentsAnalyzed: analysis.total_comments_analyzed,
-        videoTitle: analysis.video_title || `Video: ${analysis.youtube_video_id}`
+        analysisTimestamp: analysis.analysis_timestamp || analysis.created_at,
+        totalCommentsAnalyzed: analysis.total_comments_analyzed || 0,
+        videoTitle: videoTitle
       };
     }) || [];
     
