@@ -4,7 +4,8 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client'; 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/Button';
 import {
   LogOut,
@@ -24,51 +25,107 @@ import type { Session } from '@supabase/supabase-js';
 
 type UserRole = 'user' | 'analyst' | 'content_moderator' | 'super_admin';
 
+// Loading fallback component
+function NavbarLoadingFallback() {
+  return (
+    <div className="navbar w-full bg-white shadow-sm px-4 py-3">
+      <div className="animate-pulse flex items-center justify-between w-full">
+        <div className="h-8 w-32 bg-gray-200 rounded"></div>
+        <div className="h-8 w-24 bg-gray-200 rounded"></div>
+      </div>
+    </div>
+  );
+}
+
+// Wrap Navbar in Suspense boundary
 export default function Navbar() {
-  const supabase = createClient();
+  return (
+    <Suspense fallback={<NavbarLoadingFallback />}>
+      <NavbarContent />
+    </Suspense>
+  );
+}
+
+// Main Navbar content with proper client handling
+function NavbarContent() {
   const router = useRouter();
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('user');
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
+  
+  // Initialize Supabase client
   useEffect(() => {
-    const getSession = async () => {
-      setIsLoading(true);
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      console.log('Current session:', currentSession);
-      setSession(currentSession);
+    try {
+      const client = createClient();
+      setSupabase(client);
+    } catch (err: any) {
+      console.error('Failed to initialize Supabase client in Navbar:', err?.message || err);
+    }
+  }, []);
 
-      // Fetch user role if session exists
-      if (currentSession?.user) {
-        try {
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', currentSession.user.id)
-            .single();
-          console.log('Profile fetch:', { profileData, error });
-            
-          if (error) {
-            console.error('Error fetching user role:', error);
-          } else if (profileData?.role) {
-            setUserRole(profileData.role as UserRole);
-          }
-        } catch (error) {
-          console.error('Failed to fetch user role:', error);
+  // Only run session check when supabase client is available
+  useEffect(() => {
+    if (!supabase) return;
+    
+    const getSession = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch current session
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error in Navbar:', sessionError.message);
+          return;
         }
+        
+        const currentSession = data.session;
+        console.log('Current session status:', currentSession ? 'Active' : 'None');
+        
+        setSession(currentSession);
+
+        // Fetch user role if session exists
+        if (currentSession?.user?.id) {
+          try {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', currentSession.user.id)
+              .single();
+              
+            if (profileError) {
+              console.error('Error fetching user role:', profileError.message, profileError.details);
+            } else if (profileData?.role) {
+              console.log('User role fetched:', profileData.role);
+              setUserRole(profileData.role as UserRole);
+            } else {
+              console.warn('No role found for user:', currentSession.user.id);
+            }
+          } catch (error: any) {
+            console.error('Failed to fetch user role:', error?.message || error);
+          }
+        } else {
+          // Reset to default role when no session
+          setUserRole('user');
+        }
+      } catch (error: any) {
+        console.error('Unexpected error in getSession:', error?.message || error);
+      } finally {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     };
+    
     getSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+    // Only set up auth listener if supabase client is available
+    const authListener = supabase ? supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         setSession(newSession);
         
         // Update user role when auth state changes
-        if (newSession?.user) {
+        if (newSession?.user && supabase) {
           try {
             const { data: profileData, error } = await supabase
               .from('profiles')
@@ -77,27 +134,35 @@ export default function Navbar() {
               .single();
               
             if (!error && profileData?.role) {
+              console.log('User role updated to:', profileData.role);
               setUserRole(profileData.role as UserRole);
             }
-          } catch (error) {
-            console.error('Failed to fetch user role:', error);
+          } catch (error: any) {
+            console.error('Failed to fetch user role on auth change:', error?.message || error);
           }
         } else {
+          // Reset to default role when session is cleared
           setUserRole('user');
         }
       }
-    );
+    ) : { data: { subscription: { unsubscribe: () => {} } } };
 
     return () => {
-      authListener.subscription.unsubscribe();
+      if (authListener?.data?.subscription) {
+        authListener.data.subscription.unsubscribe();
+      }
     };
   }, [supabase]);
 
   const handleSignOut = async () => {
-    setIsMobileMenuOpen(false); 
-    await supabase.auth.signOut();
-    router.push('/login'); 
-    router.refresh(); 
+    setIsMobileMenuOpen(false);
+    if (supabase) {
+      await supabase.auth.signOut();
+      router.push('/login');
+      router.refresh();
+    } else {
+      console.error('Cannot sign out: Supabase client not initialized');
+    }
   };
 
   const navLinks = [

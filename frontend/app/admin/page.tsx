@@ -3,10 +3,15 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import Link from 'next/link';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+// UI components - use correct casing based on actual file names
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+// Icons
 import {
   ShieldAlert,
   Users,
@@ -16,7 +21,6 @@ import {
   ServerCrash,
   Activity
 } from 'lucide-react';
-import Link from 'next/link';
 
 type UserRole = 'user' | 'analyst' | 'content_moderator' | 'super_admin';
 
@@ -37,22 +41,81 @@ type SystemHealth = {
   timestamp: string;
 };
 
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <p className="ml-4 text-gray-600">Loading admin dashboard...</p>
+    </div>
+  );
+}
+
+// Error boundary component
+function ErrorDisplay({ message }: { message: string }) {
+  return (
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle>Authentication Error</AlertTitle>
+      <AlertDescription>{message}</AlertDescription>
+    </Alert>
+  );
+}
+
+// Wrap the dashboard in Suspense boundaries as per project standards
 export default function AdminDashboard() {
-  const supabase = createClient();
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <AdminDashboardContent />
+    </Suspense>
+  );
+}
+
+// Main dashboard content wrapped in client-side component
+function AdminDashboardContent() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  
+  // Create the Supabase client with proper typing
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  
+  // Initialize Supabase client
   useEffect(() => {
+    try {
+      const client = createClient();
+      setSupabase(client);
+    } catch (err: any) {
+      console.error('Failed to initialize Supabase client:', err?.message || err);
+      setError('Authentication service unavailable');
+    }
+  }, []);
+  
+  // Add the supabase dependency to the auth check effect
+  useEffect(() => {
+    // Skip auth check if supabase client isn't ready yet
+    if (!supabase) return;
+    
     const checkAuth = async () => {
       try {
         setLoading(true);
+        setError(null);
         
-        // Check if user is logged in
-        const { data: { session } } = await supabase.auth.getSession();
+        // Fetch session from Supabase
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setError('Authentication error');
+          router.push('/login?redirect=/admin');
+          return;
+        }
+        
+        const session = data.session;
         if (!session) {
+          console.log('No active session found');
           router.push('/login?redirect=/admin');
           return;
         }
@@ -64,9 +127,15 @@ export default function AdminDashboard() {
           .eq('id', session.user.id)
           .single();
         
-        if (profileError || !profile) {
-          console.error('Error fetching user profile:', profileError);
-          setError('You do not have permission to access this page');
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError.message, profileError.details);
+          setError('Unable to verify your permissions');
+          return;
+        }
+        
+        if (!profile) {
+          console.error('Profile not found for user:', session.user.id);
+          setError('User profile not found');
           router.push('/');
           return;
         }
@@ -74,11 +143,94 @@ export default function AdminDashboard() {
         // Check if user has admin role
         const role = profile.role as UserRole;
         if (!role || role === 'user') {
+          console.log('User does not have admin permissions:', role);
           setError('You do not have permission to access this page');
           router.push('/');
           return;
         }
         
+        console.log('User authenticated with role:', role);
+        setUserRole(role);
+        
+        // Fetch system health data for super admins
+        if (role === 'super_admin') {
+          fetchSystemHealth();
+        }
+        
+      } catch (err: any) {
+        console.error('Auth check error:', err?.message || err);
+        setError('Authentication error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAuth();
+  }, [supabase, router]);  // Include dependencies
+
+  useEffect(() => {
+    // Skip auth check if supabase client isn't ready yet
+    if (!supabase) return;
+    
+    const checkAuth = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Double-check that Supabase client is still available
+        if (!supabase) {
+          console.error('Supabase client not initialized');
+          setError('Authentication service unavailable');
+          return;
+        }
+        
+        // Check if user is logged in
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setError('Authentication error');
+          router.push('/login?redirect=/admin');
+          return;
+        }
+        
+        const session = data.session;
+        if (!session) {
+          console.log('No active session found');
+          router.push('/login?redirect=/admin');
+          return;
+        }
+        
+        // Get user role from profiles
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError.message, profileError.details);
+          setError('Unable to verify your permissions');
+          return;
+        }
+        
+        if (!profile) {
+          console.error('Profile not found for user:', session.user.id);
+          setError('User profile not found');
+          router.push('/');
+          return;
+        }
+        
+        // Check if user has admin role
+        const role = profile.role as UserRole;
+        if (!role || role === 'user') {
+          console.log('User does not have admin permissions:', role);
+          setError('You do not have permission to access this page');
+          router.push('/');
+          return;
+        }
+        
+        console.log('User authenticated with role:', role);
         setUserRole(role);
         
         // Fetch system health data
@@ -86,9 +238,9 @@ export default function AdminDashboard() {
           fetchSystemHealth();
         }
         
-      } catch (err) {
-        console.error('Auth check error:', err);
-        setError('Authentication error');
+      } catch (err: any) {
+        console.error('Auth check error:', err?.message || err);
+        setError('Authentication error occurred');
       } finally {
         setLoading(false);
       }
@@ -99,21 +251,34 @@ export default function AdminDashboard() {
   
   const fetchSystemHealth = async () => {
     try {
-      // Get JWT token for authenticated API call
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No authentication session');
+      if (!supabase) {
+        console.error('Cannot fetch system health: Supabase client not initialized');
+        return;
       }
       
-      const response = await fetch('/api/admin/system/health', {
+      // Get JWT token for authenticated API call
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        throw new Error('No active session');
+      }
+      
+      // Construct backend URL
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api';
+      const apiUrl = `${backendUrl.replace(/\/api$/, '')}/v1/admin/system/health`;
+      
+      console.log('Fetching system health data from:', apiUrl);
+      
+      // Make authenticated API call
+      const response = await fetch(apiUrl, {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${sessionData.session.access_token}`,
+          'Content-Type': 'application/json'
         }
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch system health data');
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch system health data: ${response.status} ${errorText}`);
       }
       
       const data = await response.json();
@@ -127,9 +292,12 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="container mx-auto py-8">
-        <div className="flex flex-col items-center justify-center space-y-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-          <p>Loading admin dashboard...</p>
+        <div className="animate-pulse flex flex-col space-y-4">
+          <div className="flex justify-center">
+            <div className="h-8 w-8 bg-gray-300 rounded-full"></div>
+          </div>
+          <div className="h-4 bg-gray-300 rounded w-3/4 mx-auto"></div>
+          <div className="h-4 bg-gray-300 rounded w-1/2 mx-auto"></div>
         </div>
       </div>
     );
@@ -192,7 +360,7 @@ export default function AdminDashboard() {
   });
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 space-y-6">
       <header className="mb-8">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="text-muted-foreground">Manage your TubeInsight application</p>
