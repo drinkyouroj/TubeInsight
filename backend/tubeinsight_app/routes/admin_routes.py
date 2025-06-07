@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, g, current_app
 from datetime import datetime, timedelta
 from ..middleware.admin_middleware import admin_required
 from ..services.supabase_service import get_supabase_client
-from ..services.admin_service import log_admin_action, get_user_profile, get_analytics_summary, update_user_role, update_user_status
+from ..services.admin_service import log_admin_action, get_user_profile, update_user_role, update_user_status
 
 # Initialize Blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/v1/admin')
@@ -128,24 +128,24 @@ def update_user_status_route(user_id):
 
 # Analytics Dashboard Routes
 
-@admin_bp.route('/analytics/summary', methods=['GET'])
-@admin_required(min_role='analyst')
-def get_analytics_summary_route():
-    """Get summary analytics for the admin dashboard"""
-    try:
-        timeframe = request.args.get('timeframe', 'week')
-        if timeframe not in ['day', 'week', 'month', 'year']:
-            timeframe = 'week'
-            
-        summary = get_analytics_summary(timeframe)
-        
-        if not summary:
-            return jsonify({'error': 'Failed to retrieve analytics'}), 500
-            
-        return jsonify(summary)
-    except Exception as e:
-        current_app.logger.error(f"Error getting analytics summary: {str(e)}")
-        return jsonify({'error': f'Failed to get analytics summary: {str(e)}'}), 500
+# @admin_bp.route('/analytics/summary', methods=['GET'])
+# @admin_required(min_role='analyst')
+# def get_analytics_summary_route():
+#     """Get summary analytics for the admin dashboard"""
+#     try:
+#         timeframe = request.args.get('timeframe', 'week')
+#         if timeframe not in ['day', 'week', 'month', 'year']:
+#             timeframe = 'week'
+#             
+#         summary = get_analytics_summary(timeframe) # This function call would fail
+#         
+#         if not summary:
+#             return jsonify({'error': 'Failed to retrieve analytics'}), 500
+#             
+#         return jsonify(summary)
+#     except Exception as e:
+#         current_app.logger.error(f"Error getting analytics summary: {str(e)}")
+#         return jsonify({'error': f'Failed to get analytics summary: {str(e)}'}), 500
 
 @admin_bp.route('/analytics/users', methods=['GET'])
 @admin_required(min_role='analyst')
