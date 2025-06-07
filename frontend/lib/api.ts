@@ -39,6 +39,7 @@ export interface AnalysisResult {
     date: string;
     count: number;
   }>;
+  overall_sentiment_summary?: string;
 }
 
 // Matches items in the response from GET /api/analyses

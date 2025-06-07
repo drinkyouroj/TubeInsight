@@ -24,14 +24,15 @@ export const dynamic = 'force-dynamic';
 
 // Define the props for generateMetadata inline.
 type MetadataProps = {
-  params: { analysisId: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
+  params: Promise<{ analysisId: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata(
-  { params }: MetadataProps,
+  { params: paramsPromise, searchParams: searchParamsPromise }: MetadataProps,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
+  const params = await paramsPromise;
   const { analysisId } = params;
   let pageTitle = 'Analysis Details';
   let pageDescription = 'Detailed sentiment analysis results from TubeInsight.';
@@ -49,11 +50,12 @@ export async function generateMetadata(
 
 // Define the props for the page component inline.
 type PageProps = {
-  params: { analysisId: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
+  params: Promise<{ analysisId: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default async function AnalysisDetailPage({ params }: PageProps) {
+export default async function AnalysisDetailPage({ params: paramsPromise, searchParams: searchParamsPromise }: PageProps) {
+  const params = await paramsPromise;
   const analysisId = params.analysisId;
   
   // Add debugging for the analysisId
@@ -134,10 +136,10 @@ export default async function AnalysisDetailPage({ params }: PageProps) {
   }
 
   // Prepare data for charts
-  const pieChartData: SentimentPieChartDataPoint[] = analysisData.analysis_category_summaries.map(
+  const pieChartData: SentimentPieChartDataPoint[] = analysisData.sentimentBreakdown.map(
     (item) => ({
-      category_name: item.category_name,
-      comment_count_in_category: item.comment_count_in_category,
+      category_name: item.category,
+      comment_count_in_category: item.count,
     })
   );
 
@@ -148,7 +150,7 @@ export default async function AnalysisDetailPage({ params }: PageProps) {
     })
   );
 
-  const videoTitle = analysisData.videos?.video_title || 'Untitled Video';
+  const videoTitle = analysisData.videoTitle || 'Untitled Video';
 
   const getSentimentIcon = (categoryName: string) => {
     switch (categoryName.toLowerCase()) {
@@ -174,7 +176,7 @@ export default async function AnalysisDetailPage({ params }: PageProps) {
             Analysis: {videoTitle}
           </h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            Analyzed on: {new Date(analysisData.analysis_timestamp).toLocaleString()} | Processed: {analysisData.total_comments_analyzed} comments
+            Analyzed on: {new Date(analysisData.analysisTimestamp).toLocaleString()} | Processed: {analysisData.totalCommentsAnalyzed} comments
           </p>
         </div>
       </div>
@@ -196,27 +198,29 @@ export default async function AnalysisDetailPage({ params }: PageProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {analysisData.analysis_category_summaries && analysisData.analysis_category_summaries.length > 0 ? (
-            analysisData.analysis_category_summaries.map((summaryItem) => (
-              <Card key={summaryItem.category_name} className="bg-card/50 dark:bg-slate-900/70">
+          {analysisData.sentimentBreakdown && analysisData.sentimentBreakdown.length > 0 ? (
+            analysisData.sentimentBreakdown.map((summaryItem) => (
+              <Card key={summaryItem.category} className="bg-card/50 dark:bg-slate-900/70">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center text-lg capitalize">
-                    {getSentimentIcon(summaryItem.category_name)}
-                    {summaryItem.category_name} Comments
+                    {getSentimentIcon(summaryItem.category)}
+                    {summaryItem.category} Comments
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    {summaryItem.comment_count_in_category} {summaryItem.comment_count_in_category === 1 ? 'comment' : 'comments'} classified.
+                    {summaryItem.count} comments in this category.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-foreground/90 whitespace-pre-wrap">
-                    {summaryItem.summary_text}
+                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                    {summaryItem.summary || 'No summary available for this category.'}
                   </p>
                 </CardContent>
               </Card>
             ))
           ) : (
-            <p>No sentiment breakdown available.</p>
+            <p className="text-center text-muted-foreground">
+              No category summaries available for this analysis.
+            </p>
           )}
         </CardContent>
       </Card>
