@@ -36,6 +36,7 @@ export default function Navbar() {
     const getSession = async () => {
       setIsLoading(true);
       const { data: { session: currentSession } } = await supabase.auth.getSession();
+      console.log('Current session:', currentSession);
       setSession(currentSession);
 
       // Fetch user role if session exists
@@ -46,6 +47,7 @@ export default function Navbar() {
             .select('role')
             .eq('id', currentSession.user.id)
             .single();
+          console.log('Profile fetch:', { profileData, error });
             
           if (error) {
             console.error('Error fetching user role:', error);
