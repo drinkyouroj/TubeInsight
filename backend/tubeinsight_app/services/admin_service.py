@@ -100,40 +100,57 @@ def get_all_users(page: int = 1, per_page: int = 10, role_filter: Optional[str] 
         Dictionary containing users and pagination info
     """
     try:
+        from flask import current_app
         supabase = get_supabase_client()
         
-        # Base query
-        query = supabase.table('profiles').select('*', count='exact')
+        # First, get profiles with pagination
+        profiles_query = supabase.table('profiles').select('*', count='exact')
         
-        # Apply filters
+        # Apply filters to profiles
         if role_filter:
-            query = query.eq('role', role_filter)
+            profiles_query = profiles_query.eq('role', role_filter)
         if status_filter:
-            query = query.eq('status', status_filter)
+            profiles_query = profiles_query.eq('status', status_filter)
         if search:
-            query = query.or_(f"email.ilike.%{search}%,full_name.ilike.%{search}%")
+            profiles_query = profiles_query.or_(f"full_name.ilike.%{search}%")
             
         # Add pagination
         offset = (page - 1) * per_page
-        query = query.range(offset, offset + per_page - 1)
+        profiles_query = profiles_query.range(offset, offset + per_page - 1)
         
-        # Execute query
-        response = query.execute()
+        # Execute query to get profiles
+        profiles_response = profiles_query.execute()
         
         # Get total count for pagination
-        total_count = response.count if hasattr(response, 'count') else 0
+        total_count = profiles_response.count if hasattr(profiles_response, 'count') else 0
+        profiles = profiles_response.data if hasattr(profiles_response, 'data') else []
+        
+        # Get the user IDs from the profiles
+        user_ids = [profile['id'] for profile in profiles]
+        
+        # Get the corresponding auth users to get emails
+        if user_ids:
+            users_query = supabase.rpc('get_users_with_emails', {'user_ids': user_ids})
+            users_response = users_query.execute()
+            users_data = users_response.data if hasattr(users_response, 'data') else []
+            
+            # Create a mapping of user_id to email
+            email_map = {user['id']: user['email'] for user in users_data if 'id' in user and 'email' in user}
+            
+            # Update profiles with email information
+            for profile in profiles:
+                profile['email'] = email_map.get(profile['id'])
         
         return {
-            'users': response.data if hasattr(response, 'data') else [],
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total_count,
-                'total_pages': (total_count + per_page - 1) // per_page
-            }
+            'users': profiles,
+            'total': total_count,
+            'page': page,
+            'pages': (total_count + per_page - 1) // per_page,
+            'per_page': per_page
         }
         
     except Exception as e:
+        from flask import current_app
         current_app.logger.error(f"Error in get_all_users: {str(e)}")
         raise
 

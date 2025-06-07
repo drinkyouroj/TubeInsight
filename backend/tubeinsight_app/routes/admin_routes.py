@@ -1,6 +1,6 @@
-from flask import Blueprint, request, jsonify, g, current_app
-from flask_jwt_extended import get_jwt_identity
 from datetime import datetime, timedelta
+from flask import Blueprint, request, jsonify, g, current_app
+from typing import Dict, Any, List, Optional, Tuple, Union
 from ..middleware.admin_middleware import admin_required
 from ..services.supabase_service import get_supabase_client
 from ..services.admin_service import log_admin_action, get_user_profile, update_user_role, update_user_status
@@ -12,32 +12,54 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/v1/admin')
 
 @admin_bp.route('/users', methods=['GET'])
 @admin_required(min_role='super_admin')
-def get_users():
-    """Get paginated list of users with filtering options (admin only)"""
+def get_users() -> Tuple[Dict[str, Any], int]:
+    """
+    Get paginated list of users with filtering options (admin only)
+    
+    Query Parameters:
+    - page: Page number (default: 1)
+    - per_page: Items per page (default: 10, max: 100)
+    - role: Filter by role
+    - status: Filter by status
+    - search: Search term for full_name or email
+    
+    Returns:
+        JSON response with paginated user data or error message
+    """
+    # Get user info from the request context set by admin_required
+    current_user_id = g.get('user_id')
+    current_user_role = g.get('user_role')
+    
+    current_app.logger.info(
+        f"Processing get_users request. "
+        f"Current user: {current_user_id} (Role: {current_user_role})"
+    )
+
+    # Parse and validate query parameters
     try:
-        current_user = get_jwt_identity()
-
-        # Check if user has admin role
-        if current_user.get('role') != 'super_admin':
-            return jsonify({"error": "Insufficient permissions"}), 403
-
-        # Parse query parameters
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 10))
-        role_filter = request.args.get('role', None)
-        status_filter = request.args.get('status', None)
-        search = request.args.get('search', None)
-        
-        # Calculate offset for pagination
-        offset = (page - 1) * per_page
-        
+        page = max(1, int(request.args.get('page', 1)))
+        per_page = min(100, max(1, int(request.args.get('per_page', 10))))
+        role_filter = request.args.get('role')
+        status_filter = request.args.get('status')
+        search = request.args.get('search')
+    except (ValueError, TypeError) as e:
+        current_app.logger.error(f"Invalid query parameters: {str(e)}")
+        return {'error': 'Invalid query parameters', 'code': 'invalid_parameters'}, 400
+    
+    # Calculate offset for pagination
+    offset = (page - 1) * per_page
+    
+    try:
         # Get Supabase client
         supabase = get_supabase_client()
+        if not supabase:
+            current_app.error("Supabase client not available")
+            return {'error': 'Service unavailable', 'code': 'service_unavailable'}, 503
         
-        # Build query
-        query = supabase.table('profiles').select('*')
+        # Build base query with count
+        query = supabase.table('profiles').select('*', count='exact')
         
-        # Apply filters
+        # Apply filters if provided
         if role_filter:
             query = query.eq('role', role_filter)
             
@@ -45,27 +67,39 @@ def get_users():
             query = query.eq('status', status_filter)
             
         if search:
-            # Search in full_name and email
-            query = query.or_(f"full_name.ilike.%{search}%,email.ilike.%{search}%")
-            
-        # Get total count (for pagination)
-        count_response = query.execute()
-        total_count = len(count_response.data)
+            # Search in full_name and email (case-insensitive)
+            search_term = f"%{search}%"
+            query = query.or_(f"full_name.ilike.{search_term},email.ilike.{search_term}")
+        
+        # Execute count query
+        count_result = query.execute()
+        total_count = count_result.count if hasattr(count_result, 'count') else 0
         
         # Get paginated results
-        paginated_query = query.range(offset, offset + per_page - 1).order('created_at', desc=True)
-        response = paginated_query.execute()
+        paginated_result = query.range(offset, offset + per_page - 1)
+        paginated_result = paginated_result.order('created_at', desc=True).execute()
         
-        return jsonify({
-            'users': response.data,
-            'total': total_count,
-            'page': page,
-            'per_page': per_page,
-            'pages': (total_count + per_page - 1) // per_page  # Ceiling division
-        })
+        users = paginated_result.data if hasattr(paginated_result, 'data') else []
+        
+        current_app.logger.info(f"Retrieved {len(users)} of {total_count} users")
+        
+        # Prepare response
+        response_data = {
+            'data': users,
+            'pagination': {
+                'total': total_count,
+                'page': page,
+                'per_page': per_page,
+                'total_pages': (total_count + per_page - 1) // per_page  # Ceiling division
+            }
+        }
+        
+        return response_data, 200
+        
     except Exception as e:
-        current_app.logger.error(f"Error getting users: {str(e)}")
-        return jsonify({'error': f'Failed to get users: {str(e)}'}), 500
+        error_msg = f"Error retrieving users: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return {'error': 'Internal server error', 'code': 'server_error'}, 500
 
 
 @admin_bp.route('/users/<user_id>', methods=['GET'])
