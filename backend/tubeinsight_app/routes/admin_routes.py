@@ -688,19 +688,19 @@ def get_system_health():
         # Get recent API usage
         # Last 24 hours
         day_ago = (datetime.now() - timedelta(days=1)).isoformat()
-        api_day = supabase.table('api_usage_logs').select('api_type').gte('created_at', day_ago).execute()
+        api_day = supabase.table('api_usage_logs').select('api_name').gte('created_at', day_ago).execute()
         
         for entry in api_day.data:
-            api_type = entry.get('api_type')
+            api_type = entry.get('api_name')  # Use api_name instead of api_type
             if api_type:
                 metrics['api_usage']['last_24h'][api_type] = metrics['api_usage']['last_24h'].get(api_type, 0) + 1
         
         # Last 7 days
         week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-        api_week = supabase.table('api_usage_logs').select('api_type').gte('created_at', week_ago).execute()
+        api_week = supabase.table('api_usage_logs').select('api_name').gte('created_at', week_ago).execute()
         
         for entry in api_week.data:
-            api_type = entry.get('api_type')
+            api_type = entry.get('api_name')  # Use api_name instead of api_type
             if api_type:
                 metrics['api_usage']['last_7d'][api_type] = metrics['api_usage']['last_7d'].get(api_type, 0) + 1
         
