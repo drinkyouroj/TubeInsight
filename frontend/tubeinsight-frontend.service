@@ -1,0 +1,14 @@
+[Unit]
+Description=Next.js instance to serve TubeInsight frontend
+After=network.target
+
+[Service]
+User=your_username # Replace with the user running the app
+Group=www-data # Or your user's group
+WorkingDirectory=/home/your_username/TubeInsight/frontend
+# You may need to specify the path to Node if it's not in the default PATH
+# Environment="NODE_ENV=production" # The `start` script typically does this
+ExecStart=/usr/bin/npm start -- --hostname 127.0.0.1 --port 3000 # Use absolute path to npm if needed
+
+[Install]
+WantedBy=multi-user.target
