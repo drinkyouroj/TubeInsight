@@ -1,7 +1,7 @@
 // File: frontend/components/dashboard/VideoUrlInputForm.tsx
 'use client'; // This is a client component for form handling and state
 
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -23,7 +23,17 @@ export default function VideoUrlInputForm() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const router = useRouter();
+  
+  // Add client initialization state
+  const [clientReady, setClientReady] = useState(false);
   const supabase = useSupabase(); // Get Supabase client from context
+  
+  // Check if Supabase client is available on mount
+  useEffect(() => {
+    if (supabase) {
+      setClientReady(true);
+    }
+  }, [supabase]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -33,6 +43,13 @@ export default function VideoUrlInputForm() {
 
     if (!videoUrl.trim()) {
       setError('Please enter a YouTube video URL.');
+      setIsLoading(false);
+      return;
+    }
+
+    // Check if Supabase client is available
+    if (!supabase) {
+      setError('Authentication service not available. Please refresh the page and try again.');
       setIsLoading(false);
       return;
     }

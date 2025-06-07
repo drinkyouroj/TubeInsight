@@ -107,43 +107,57 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
     console.log(JSON.stringify(analysisData, null, 2));
     console.log('--- END RAW ANALYSIS DATA ---');
 
+    // Transform API response to match frontend expected structure
+    // This handles both the old backend format and the new TypeScript interface format
+    const transformedData = {
+      ...analysisData,
+      videoTitle: analysisData.videoTitle || analysisData.videos?.video_title || 'Untitled Video',
+      analysisTimestamp: analysisData.analysisTimestamp || analysisData.analysis_timestamp || new Date().toISOString(),
+      totalCommentsAnalyzed: analysisData.totalCommentsAnalyzed || analysisData.total_comments_analyzed || 0,
+      sentimentBreakdown: analysisData.sentimentBreakdown || 
+        (analysisData.analysis_category_summaries?.map(item => ({
+          category: item.category_name,
+          count: item.comment_count_in_category,
+          summary: item.summary_text
+        })) || [])
+    };
+
+    analysisData = transformedData;
+    
   } catch (error: any) {
     console.error(`Error in AnalysisDetailPage for ID '${analysisId}':`, error);
     // Ensure analysisData is null or an empty object if an error occurs before its usage
-    analysisData = null; // Or some default error state object
-    fetchError = error.message || 'An unexpected error occurred while fetching analysis details.';
+    throw new Error(`Failed to load analysis: ${error.message}`);
   }
-  // --- End of Data Fetching Logic ---
 
-
-  if (fetchError || !analysisData) {
+  if (!analysisData) {
     return (
-      <div className="container mx-auto flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center space-y-4 p-4 text-center">
-        <AlertTriangle className="h-16 w-16 text-destructive" />
-        <h2 className="text-2xl font-semibold text-foreground">
-          {fetchError?.toLowerCase().includes('not found') ? 'Analysis Not Found' : 'Error Loading Analysis'}
-        </h2>
-        <p className="text-muted-foreground">
-          {fetchError || 'The analysis you are looking for could not be loaded, or you do not have permission to view it.'}
-        </p>
-        <Link href="/history">
-          <Button variant="outline" className="mt-4 flex items-center">
-            <ChevronLeft className="mr-2 h-4 w-4" /> Back to History
-          </Button>
-        </Link>
+      <div className="container py-6">
+        <div className="rounded-lg border border-destructive bg-destructive/10 p-6 text-center text-destructive">
+          <AlertTriangle className="mx-auto mb-3 h-12 w-12" />
+          <h2 className="text-xl font-semibold">Analysis Not Found</h2>
+          <p className="mt-2">
+            The analysis you&apos;re looking for doesn&apos;t exist or was removed.
+          </p>
+          <Link href="/history" className="mt-4 inline-block">
+            <Button variant="outline" size="sm" className="inline-flex items-center">
+              <ChevronLeft className="mr-2 h-4 w-4" /> Back to History
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
 
-  // Prepare data for charts
-  const pieChartData: SentimentPieChartDataPoint[] = analysisData.sentimentBreakdown.map(
+  // Prepare data for charts - now using the transformed data
+  const pieChartData: SentimentPieChartDataPoint[] = (analysisData.sentimentBreakdown || []).map(
     (item) => ({
       category_name: item.category,
       comment_count_in_category: item.count,
     })
   );
 
-  const barChartData: CommentsByDateDataPoint[] = analysisData.commentsByDate.map(
+  const barChartData: CommentsByDateDataPoint[] = (analysisData.commentsByDate || []).map(
     (item) => ({
       date: item.date,
       count: item.count,

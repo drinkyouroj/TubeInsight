@@ -10,9 +10,10 @@ import {
   CardContent,
   CardFooter, // Added for potential future use (e.g., tips or links)
 } from '@/components/ui/Card';
-import { Youtube, Search, AlertCircle } from 'lucide-react'; // Icons
+import { Youtube, Search, AlertCircle, Loader } from 'lucide-react'; // Icons
 import VideoUrlInputForm from '@/components/dashboard/VideoUrlInputForm'; // We'll create this component
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   title: 'Analyze Video',
@@ -58,7 +59,14 @@ export default async function AnalyzePage() {
         </CardHeader>
         <CardContent className="px-4 py-6 sm:px-6">
           {/* The VideoUrlInputForm will handle the input and submission logic */}
-          <VideoUrlInputForm />
+          <Suspense fallback={
+            <div className="flex justify-center items-center py-8">
+              <Loader className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">Loading form...</span>
+            </div>
+          }>
+            <VideoUrlInputForm />
+          </Suspense>
         </CardContent>
         <CardFooter className="border-t border-border bg-muted/50 px-4 py-4 sm:px-6">
           <div className="flex items-start space-x-2 text-xs text-muted-foreground">
