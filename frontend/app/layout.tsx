@@ -5,6 +5,7 @@ import { Inter } from 'next/font/google';
 import './globals.css'; // Import global styles, including Tailwind directives
 import SupabaseListener from '@/components/auth/SupabaseListener'; // For client-side auth updates
 import SupabaseProvider from '@/contexts/SupabaseProvider'; // To provide Supabase client via context
+import DebugEnv from '@/components/DebugEnv';
 
 // Initialize the Inter font with the 'latin' subset and assign it to a CSS variable
 const inter = Inter({
@@ -56,6 +57,7 @@ export default function RootLayout({
           */}
           {children}
         </SupabaseProvider>
+        {process.env.NODE_ENV === 'development' && <DebugEnv />}
       </body>
     </html>
   );

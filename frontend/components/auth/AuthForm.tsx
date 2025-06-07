@@ -21,8 +21,8 @@ export default function AuthForm() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Get the full URL for redirect after login
-    const redirectTo = `${window.location.origin}/auth/callback`;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    const redirectTo = `${siteUrl}/auth/callback`;
     console.log('Setting redirectTo URL:', redirectTo);
     setRedirectToUrl(redirectTo);
     setIsLoading(false);

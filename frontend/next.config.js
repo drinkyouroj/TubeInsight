@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true, // Recommended for highlighting potential problems in an application.
+  // Expose environment variables to the browser
+  env: {
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  },
   // You can add other Next.js specific configurations here as your project grows.
   // For example:
   // images: {
