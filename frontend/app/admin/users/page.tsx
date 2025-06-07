@@ -2,33 +2,101 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { authFetch } from "@/utils/api";
 
 type User = {
   id: string;
-  email: string;
-  full_name?: string;
+  email?: string;  // Made optional to match UserProfile
+  full_name?: string | null;
   role: string;
   status: string;
-  created_at?: string;
+  created_at: string;
+  updated_at?: string;
 };
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
 
+  // Define types for the API response
+  interface Pagination {
+    total: number;
+    page: number;
+    per_page: number;
+    total_pages: number;
+  }
+
+  interface ApiResponse<T> {
+    data: T;
+    pagination: Pagination;
+  }
+
+  interface UserProfile {
+    id: string;
+    email?: string;
+    full_name?: string | null;
+    role: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  }
+
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await authFetch('/api/admin/users');
-      setUsers(Array.isArray(data) ? data : data.users || []);
       setError(null);
+      
+      // Construct the base URL
+      const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
+      const url = new URL(`${baseUrl}/v1/admin/users`);
+      
+      // Add query parameters
+      const params = new URLSearchParams();
+      params.append('page', '1');
+      params.append('per_page', '20');
+      
+      // Add filters if needed
+      // if (searchTerm) params.append('search', searchTerm);
+      // if (roleFilter) params.append('role', roleFilter);
+      
+      url.search = params.toString();
+      
+      console.log('Fetching users from:', url.toString());
+      
+      const response = await authFetch<ApiResponse<UserProfile[]>>(url.toString());
+      console.log('Fetched users data:', response);
+      
+      if (response && response.data) {
+        // Convert UserProfile[] to User[] by ensuring all required fields are present
+        const userData: User[] = response.data.map(profile => ({
+          id: profile.id,
+          email: profile.email || undefined,
+          full_name: profile.full_name || undefined,
+          role: profile.role,
+          status: profile.status,
+          created_at: profile.created_at,
+          updated_at: profile.updated_at
+        }));
+        
+        setUsers(userData);
+        setPagination(response.pagination);
+      } else {
+        setUsers([]);
+        setError('No data returned from server');
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to fetch users');
+      const errorMessage = err?.data?.error || err?.message || 'Failed to fetch users';
+      setError(errorMessage);
       console.error('Error fetching users:', err);
+      
+      // If it's an authentication error, redirect to login
+      if (err?.status === 401) {
+        window.location.href = '/login?redirect=/admin/users';
+      }
     } finally {
       setLoading(false);
     }
@@ -37,17 +105,37 @@ export default function AdminUsersPage() {
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
       setUpdating(prev => ({ ...prev, [userId]: true }));
-      await authFetch(`/api/admin/users/${userId}/role`, {
+      
+      const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
+      const url = `${baseUrl}/v1/admin/users/${userId}/role`;
+      
+      console.log(`Updating role for user ${userId} to ${newRole}`);
+      
+      await authFetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ role: newRole }),
       });
-      await fetchUsers(); // Refresh the list
+      
+      // Show success message
+      setError(null);
+      
+      // Refresh the user list
+      await fetchUsers();
+      
+      // Show success toast/notification
+      // You might want to use a proper toast/notification library
+      alert(`Successfully updated user role to ${newRole}`);
+      
     } catch (err: any) {
-      setError(`Failed to update user role: ${err?.message || 'Unknown error'}`);
+      const errorMessage = err?.data?.error || err?.message || 'Failed to update user role';
+      setError(errorMessage);
       console.error('Error updating user role:', err);
+      
+      // Show error toast/notification
+      alert(`Error: ${errorMessage}`);
     } finally {
       setUpdating(prev => ({ ...prev, [userId]: false }));
     }
@@ -57,22 +145,29 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  if (loading) {
+  if (loading && users.length === 0) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="flex justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        </div>
+      <div className="flex items-center justify-center min-h-[200px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto py-8">
+      <div className="space-y-4">
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            {error}
+            <Button 
+              variant="outline" 
+              className="ml-4"
+              onClick={() => fetchUsers()}
+            >
+              Retry
+            </Button>
+          </AlertDescription>
         </Alert>
       </div>
     );
@@ -110,7 +205,7 @@ export default function AdminUsersPage() {
               <tr key={user.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">
-                    {user.email}
+                    {user.email || <span className="text-gray-400 italic">No email</span>}
                   </div>
                   {user.full_name && (
                     <div className="text-sm text-gray-500">{user.full_name}</div>
