@@ -4,6 +4,16 @@ import { createServerClient as createMiddlewareClient, type CookieOptions } from
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  console.log(`[Middleware] Request for: ${pathname}`);
+
+  // If the request is for any /api/ path, log it and pass it through directly.
+  // This is a diagnostic step to see if middleware's Supabase logic interferes with API routes.
+  if (pathname.startsWith('/api/')) {
+    console.log(`[Middleware] API route ${pathname} detected. Bypassing Supabase logic in middleware and passing through.`);
+    return NextResponse.next(); 
+  }
+
   // Create an mutable response object by cloning the request headers
   // This allows us to set cookies on the response later.
   let response = NextResponse.next({
@@ -46,8 +56,6 @@ export async function middleware(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  const { pathname } = request.nextUrl;
-
   // Define protected routes.
   // These are routes that require authentication.
   // We assume the root '/' is part of the protected dashboard experience.
@@ -85,23 +93,61 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
+  // Admin route protection
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    // Add this check to ensure session and session.user exist
+    if (!session || !session.user) {
+      // If no session or user, redirect to login, preserving the intended admin path
+      return NextResponse.redirect(new URL(`/login?redirect=${encodeURIComponent(request.nextUrl.pathname)}`, request.url));
+    }
+    try {
+      // Get user role from profiles
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      // Role hierarchy
+      const roleHierarchy: Record<string, number> = {
+        'user': 0,
+        'analyst': 1,
+        'content_moderator': 2,
+        'super_admin': 3
+      };
+
+      // Check role requirements based on URL pattern
+      let requiredRole = 'analyst'; // Default minimum role for admin area
+
+      // Special path-based requirements
+      if (request.nextUrl.pathname.startsWith('/admin/users')) {
+        requiredRole = 'super_admin';
+      } else if (request.nextUrl.pathname.startsWith('/admin/moderation')) {
+        requiredRole = 'content_moderator';
+      }
+
+      // Check if user has sufficient permissions
+      if (!profile || 
+          !profile.role || 
+          roleHierarchy[profile.role] < roleHierarchy[requiredRole]) {
+        // User doesn't have sufficient permissions, redirect to homepage
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+    } catch (error) {
+      console.error('Error checking user role:', error);
+      // If there's an error, we redirect to homepage for safety
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+  }
+
   // If none of the above conditions are met, proceed with the request.
   return response;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - auth/callback (Supabase OAuth callback route - we'll create this next)
-     * - api/ (if you had Next.js API routes - we are using Flask for the main API)
-     *
-     * This matcher pattern ensures that the middleware runs on relevant pages
-     * (like '/', '/login', '/analyze', etc.) but not on static assets or special routes.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|auth/callback|api/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|auth/callback).*)',
+    '/admin/:path*',
+    '/api/admin/:path*'
   ],
 };
