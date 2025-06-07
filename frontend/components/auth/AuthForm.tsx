@@ -28,7 +28,7 @@ export default function AuthForm() {
     setIsLoading(false);
 
     // Check for any error messages in the URL
-    const error = searchParams.get('error');
+    const error = searchParams?.get('error');
     if (error) {
       setError(`Authentication error: ${error}`);
     }
@@ -60,7 +60,10 @@ export default function AuthForm() {
           router.refresh();
         } catch (err) {
           console.error('AuthForm: Error during sign in:', err);
-          setError(`Error during sign in: ${err.message}`);
+          const message = (err && typeof err === 'object' && 'message' in err)
+            ? (err as any).message
+            : String(err);
+          setError(`Error during sign in: ${message}`);
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('AuthForm: SIGNED_OUT event detected.');
