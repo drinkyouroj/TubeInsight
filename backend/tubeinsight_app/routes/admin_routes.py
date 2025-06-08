@@ -1,9 +1,13 @@
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, g, current_app
-from typing import Dict, Any, List, Optional, Tuple, Union
+from flask_jwt_extended import jwt_required, get_jwt_identity
+import traceback
 from ..middleware.admin_middleware import admin_required
+from ..middleware.role_permissions import Permissions, UserRole, can_modify_user
+from ..services.admin_service import (
+    get_all_users, get_user_details, update_user_role, update_user_status
+)
 from ..services.supabase_service import get_supabase_client
-from ..services.admin_service import log_admin_action, get_user_profile, update_user_role, update_user_status
 
 # Initialize Blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/v1/admin')
@@ -11,8 +15,8 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/v1/admin')
 # User Management Routes
 
 @admin_bp.route('/users', methods=['GET'])
-@admin_required(min_role='super_admin')
-def get_users() -> Tuple[Dict[str, Any], int]:
+@admin_required(required_permission=Permissions.VIEW_USERS)
+def get_users():
     """
     Get paginated list of users with filtering options (admin only)
     
@@ -118,19 +122,36 @@ def get_user_details(user_id):
         return jsonify({'error': f'Failed to get user details: {str(e)}'}), 500
 
 @admin_bp.route('/users/<user_id>/role', methods=['PUT'])
-# @admin_required(min_role='super_admin') # Temporarily commented out
+@admin_required(required_permission=Permissions.MODIFY_USER_ROLE)
 def update_user_role_route(user_id):
-    """Update a user's role (super_admin only) - TEMPORARILY MODIFIED"""
+    """Update a user's role (super_admin only)"""
     try:
         data = request.json
         new_role = data.get('role')
+        current_user_role = g.user_role
 
-        if new_role not in ['user', 'analyst', 'content_moderator', 'super_admin']:
+        if new_role not in [UserRole.USER, UserRole.ANALYST, UserRole.CONTENT_MODERATOR, UserRole.SUPER_ADMIN]:
             return jsonify({'error': 'Invalid role specified'}), 400
 
-        # Don't allow changing own role - Temporarily commented out
-        # if user_id == g.user_id:
-        #     return jsonify({'error': 'Cannot change your own role'}), 400
+        # Don't allow changing own role
+        if user_id == g.user_id:
+            return jsonify({'error': 'Cannot change your own role'}), 400
+            
+        # Get target user's role before updating
+        supabase = get_supabase_client()
+        user_response = supabase.table('profiles').select('role').eq('id', user_id).single().execute()
+        
+        if not user_response.data:
+            return jsonify({'error': 'User not found'}), 404
+            
+        target_user_role = user_response.data.get('role')
+        
+        # Check if the current user can modify the target user based on roles
+        if not can_modify_user(current_user_role, target_user_role):
+            return jsonify({
+                'error': 'You do not have permission to modify users with this role',
+                'code': 'role_permission_denied'
+            }), 403
 
         result = update_user_role(user_id, new_role)
         
@@ -143,13 +164,14 @@ def update_user_role_route(user_id):
         return jsonify({'error': f'Failed to update user role: {str(e)}'}), 500
 
 @admin_bp.route('/users/<user_id>/status', methods=['PUT'])
-@admin_required(min_role='content_moderator')
+@admin_required(required_permission=Permissions.MODIFY_USER_STATUS)
 def update_user_status_route(user_id):
     """Update a user's status (active, suspended, banned)"""
     try:
         data = request.json
         new_status = data.get('status')
         reason = data.get('reason', '')
+        current_user_role = g.user_role
         
         if new_status not in ['active', 'suspended', 'banned']:
             return jsonify({'error': 'Invalid status specified'}), 400
@@ -157,6 +179,22 @@ def update_user_status_route(user_id):
         # Don't allow changing own status
         if user_id == g.user_id:
             return jsonify({'error': 'Cannot change your own status'}), 400
+            
+        # Get target user's role before updating
+        supabase = get_supabase_client()
+        user_response = supabase.table('profiles').select('role').eq('id', user_id).single().execute()
+        
+        if not user_response.data:
+            return jsonify({'error': 'User not found'}), 404
+            
+        target_user_role = user_response.data.get('role')
+        
+        # Check if the current user can modify the target user based on roles
+        if not can_modify_user(current_user_role, target_user_role):
+            return jsonify({
+                'error': 'You do not have permission to modify users with this role',
+                'code': 'role_permission_denied'
+            }), 403
             
         result = update_user_status(user_id, new_status, reason)
         
@@ -190,7 +228,7 @@ def update_user_status_route(user_id):
 #         return jsonify({'error': f'Failed to get analytics summary: {str(e)}'}), 500
 
 @admin_bp.route('/analytics/users', methods=['GET'])
-@admin_required(min_role='analyst')
+@admin_required(required_permission=Permissions.VIEW_ANALYTICS)
 def get_user_analytics():
     """Get user growth analytics data for charts"""
     try:
@@ -229,7 +267,7 @@ def get_user_analytics():
         return jsonify({'error': f'Failed to get user analytics: {str(e)}'}), 500
 
 @admin_bp.route('/analytics/analyses', methods=['GET'])
-@admin_required(min_role='analyst')
+@admin_required(required_permission=Permissions.VIEW_ANALYTICS)
 def get_analyses_analytics():
     """Get analyses statistics for charts"""
     try:
@@ -640,7 +678,7 @@ def update_user_rate_limits(user_id):
         return jsonify({'error': f'Failed to update rate limits: {str(e)}'}), 500
 
 @admin_bp.route('/system/health', methods=['GET'])
-@admin_required(min_role='super_admin')
+@admin_required(required_permission=Permissions.VIEW_SYSTEM_HEALTH)
 def get_system_health():
     """Get system health statistics"""
     try:

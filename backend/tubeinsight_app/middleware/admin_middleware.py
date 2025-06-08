@@ -5,16 +5,19 @@ from flask import request, jsonify, g, current_app
 from ..services.supabase_service import get_supabase_client
 from supabase import Client as SupabaseClient
 from typing import Optional, Dict, Any, Callable, TypeVar, cast
+from .role_permissions import is_role_at_least, has_permission, UserRole, Permissions
 
 F = TypeVar('F', bound=Callable[..., Any])
 
-def admin_required(min_role: str = 'super_admin') -> Callable[[F], F]:
+def admin_required(min_role: str = UserRole.SUPER_ADMIN, required_permission: str = None) -> Callable[[F], F]:
     """
-    Decorator to require minimum admin role level.
+    Decorator to require minimum admin role level or specific permission.
     
     Args:
         min_role: Minimum role required to access the endpoint.
-                 Must be one of: 'user', 'analyst', 'content_moderator', 'super_admin'
+                 Must be one of the UserRole enum values.
+        required_permission: Specific permission required to access the endpoint.
+                           If provided, the user must have this permission regardless of role.
     """
     def decorator(func: F) -> F:
         @wraps(func)
@@ -58,27 +61,45 @@ def admin_required(min_role: str = 'super_admin') -> Callable[[F], F]:
                         return jsonify({'error': 'User profile not found', 'code': 'profile_not_found'}), 404
                     
                     profile = profile_response.data
-                    user_role = profile.get('role', 'user')
+                    user_role = profile.get('role', UserRole.USER)
                     current_app.logger.info(f"User role: {user_role}")
                     
-                    # Define role hierarchy
-                    role_hierarchy = {
-                        'user': 0,
-                        'analyst': 1,
-                        'content_moderator': 2,
-                        'super_admin': 3
-                    }
+                    access_granted = False
                     
-                    # Check if user has sufficient privileges
-                    if role_hierarchy.get(user_role, 0) < role_hierarchy.get(min_role, 0):
-                        current_app.logger.warning(
-                            f"Access denied: User role '{user_role}' is below required role '{min_role}'"
-                        )
+                    # Check role and permission requirements
+                    if required_permission:
+                        # If a specific permission is required, check if the user has it
+                        if has_permission(user_role, required_permission):
+                            access_granted = True
+                        else:
+                            current_app.logger.warning(
+                                f"Access denied: User role '{user_role}' lacks required permission '{required_permission}'"
+                            )
+                            return jsonify({
+                                'error': 'Insufficient permissions',
+                                'code': 'insufficient_permissions',
+                                'required_permission': required_permission,
+                                'user_role': user_role
+                            }), 403
+                    else:
+                        # If no specific permission required, check role hierarchy
+                        if is_role_at_least(user_role, min_role):
+                            access_granted = True
+                        else:
+                            current_app.logger.warning(
+                                f"Access denied: User role '{user_role}' is below required role '{min_role}'"
+                            )
+                            return jsonify({
+                                'error': 'Insufficient permissions',
+                                'code': 'insufficient_permissions',
+                                'required_role': min_role,
+                                'user_role': user_role
+                            }), 403
+                    
+                    if not access_granted:
                         return jsonify({
                             'error': 'Insufficient permissions',
                             'code': 'insufficient_permissions',
-                            'required_role': min_role,
-                            'user_role': user_role
                         }), 403
                     
                     # Store user info in request context for use in route handlers

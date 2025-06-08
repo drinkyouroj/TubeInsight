@@ -4,10 +4,12 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
 
+// Import permissions system
+import { UserRole, Permission, hasPermission, canModifyUser } from '@/utils/permissions';
+
 // Initialize Supabase client
 const supabase = createClient();
 
-type UserRole = 'user' | 'analyst' | 'content_moderator' | 'super_admin';
 type UserStatus = 'active' | 'suspended' | 'banned';
 
 interface User {
@@ -42,11 +44,47 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const fetchCurrentUserRole = useCallback(async () => {
+    try {
+      // Get session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+      
+      setCurrentUserId(session.user.id);
+      
+      // Get user profile to determine role
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+        
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+        throw new Error('Failed to get user permissions');
+      }
+      
+      const role = profile?.role as UserRole;
+      setCurrentUserRole(role);
+      return role;
+    } catch (err) {
+      console.error('Error getting current user role:', err);
+      return null;
+    }
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      
+      // Get current user role first
+      await fetchCurrentUserRole();
       
       // Construct the base URL
       const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
@@ -109,10 +147,15 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchCurrentUserRole]);
 
   const updateUserAttribute = async (userId: string, attribute: string, newValue: string, displayName: string) => {
     try {
+      // Don't allow users to modify their own role or status
+      if (userId === currentUserId) {
+        throw new Error(`You cannot change your own ${displayName}`);
+      }
+
       setUpdating(prev => ({ ...prev, [`${userId}-${attribute}`]: true }));
       setError(null);
       
@@ -158,8 +201,8 @@ export default function AdminUsersPage() {
       
       if (!response.ok) {
         const errorMessage = responseData?.error?.message || 
-                            responseData?.message || 
-                            `Failed to update user ${displayName} (${response.status})`;
+                             responseData?.message || 
+                             `Failed to update user ${displayName} (${response.status})`;
         throw new Error(errorMessage);
       }
       
@@ -258,43 +301,92 @@ export default function AdminUsersPage() {
                     <div className="text-sm text-gray-500">{user.full_name}</div>
                   )}
                 </td>
+                
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <select
-                    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                    value={user.role}
-                    onChange={(e) => {
-                      const role = e.target.value as UserRole;
-                      updateUserRole(user.id, role);
-                    }}
-                    disabled={updating[user.id]}
-                  >
-                    <option value="user">User</option>
-                    <option value="analyst">Analyst</option>
-                    <option value="content_moderator">Content Moderator</option>
-                    <option value="super_admin">Super Admin</option>
-                  </select>
+                  {/* Role dropdown - only show if user has permission to modify roles */}
+                  {hasPermission(currentUserRole || UserRole.USER, Permission.MODIFY_USER_ROLE) && 
+                   canModifyUser(currentUserRole || UserRole.USER, user.role) && 
+                   user.id !== currentUserId ? (
+                    <div>
+                      <select
+                        className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                        value={user.role}
+                        onChange={(e) => {
+                          const role = e.target.value as UserRole;
+                          updateUserRole(user.id, role);
+                        }}
+                        disabled={updating[`${user.id}-role`]}
+                      >
+                        <option value={UserRole.USER}>User</option>
+                        <option value={UserRole.ANALYST}>Analyst</option>
+                        <option value={UserRole.CONTENT_MODERATOR}>Content Moderator</option>
+                        <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
+                      </select>
+                      {updating[`${user.id}-role`] && (
+                        <div className="mt-2 text-xs text-blue-500">Updating...</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-800">
+                      {user.role}
+                      {!canModifyUser(currentUserRole || UserRole.USER, user.role) && 
+                        currentUserRole !== UserRole.SUPER_ADMIN && (
+                          <div className="text-xs text-gray-500 mt-1">(Cannot modify this role)</div>
+                      )}
+                      {user.id === currentUserId && (
+                        <div className="text-xs text-gray-500 mt-1">(Your account)</div>
+                      )}
+                    </div>
+                  )}
                 </td>
+                
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <select
-                    className={`block w-full pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md
-                      ${user.status === 'active' ? 'bg-green-50 text-green-800' : 
-                        user.status === 'suspended' ? 'bg-yellow-50 text-yellow-800' : 
-                        'bg-red-50 text-red-800'}`}
-                    value={user.status}
-                    onChange={(e) => {
-                      const status = e.target.value as UserStatus;
-                      updateUserStatus(user.id, status);
-                    }}
-                    disabled={updating[`${user.id}-status`]}
-                  >
-                    <option value="active" className="bg-green-50 text-green-800">Active</option>
-                    <option value="suspended" className="bg-yellow-50 text-yellow-800">Suspended</option>
-                    <option value="banned" className="bg-red-50 text-red-800">Banned</option>
-                  </select>
+                  {/* Status dropdown - only show if user has permission to modify status */}
+                  {hasPermission(currentUserRole || UserRole.USER, Permission.MODIFY_USER_STATUS) && 
+                   canModifyUser(currentUserRole || UserRole.USER, user.role) &&
+                   user.id !== currentUserId ? (
+                    <div>
+                      <select
+                        className={`block w-full pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md
+                          ${user.status === 'active' ? 'bg-green-50 text-green-800' : 
+                            user.status === 'suspended' ? 'bg-yellow-50 text-yellow-800' : 
+                            'bg-red-50 text-red-800'}`}
+                        value={user.status}
+                        onChange={(e) => {
+                          const status = e.target.value as UserStatus;
+                          updateUserStatus(user.id, status);
+                        }}
+                        disabled={updating[`${user.id}-status`]}
+                      >
+                        <option value="active" className="bg-green-50 text-green-800">Active</option>
+                        <option value="suspended" className="bg-yellow-50 text-yellow-800">Suspended</option>
+                        <option value="banned" className="bg-red-50 text-red-800">Banned</option>
+                      </select>
+                      {updating[`${user.id}-status`] && (
+                        <div className="mt-2 text-xs text-blue-500">Updating...</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className={`text-sm ${user.status === 'active' ? 'text-green-600' : 
+                                           user.status === 'suspended' ? 'text-yellow-600' : 
+                                           'text-red-600'}`}>
+                      {user.status}
+                      {user.id === currentUserId && (
+                        <div className="text-xs text-gray-500 mt-1">(Your account)</div>
+                      )}
+                    </div>
+                  )}
                 </td>
+                
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {updating[`${user.id}-role`] ? 'Updating role...' : ''}
-                  {updating[`${user.id}-status`] ? 'Updating status...' : ''}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => console.log('View details:', user.id)}
+                    disabled={updating[`${user.id}-role`] || updating[`${user.id}-status`]}
+                  >
+                    Details
+                  </Button>
                 </td>
               </tr>
             ))}

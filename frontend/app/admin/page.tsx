@@ -22,7 +22,8 @@ import {
   Activity
 } from 'lucide-react';
 
-type UserRole = 'user' | 'analyst' | 'content_moderator' | 'super_admin';
+// Import permissions system
+import { UserRole, Permission, hasPermission } from '@/utils/permissions';
 
 type SystemHealth = {
   database: {
@@ -152,8 +153,8 @@ function AdminDashboardContent() {
         console.log('User authenticated with role:', role);
         setUserRole(role);
         
-        // Fetch system health data for super admins
-        if (role === 'super_admin') {
+        // Fetch system health data if user has permission
+        if (hasPermission(role, Permission.VIEW_SYSTEM_HEALTH)) {
           fetchSystemHealth();
         }
         
@@ -321,42 +322,34 @@ function AdminDashboardContent() {
       label: 'Admin Dashboard',
       icon: <ShieldAlert className="mr-2 h-5 w-5" />,
       description: 'Overview of system metrics and admin tools',
-      minRole: 'analyst'
+      permission: Permission.VIEW_ANALYTICS
     },
     {
       href: '/admin/users',
       label: 'User Management',
       icon: <Users className="mr-2 h-5 w-5" />,
       description: 'Manage users, roles and permissions',
-      minRole: 'super_admin'
+      permission: Permission.VIEW_USERS
     },
     {
       href: '/admin/analytics',
       label: 'Analytics',
       icon: <FileBarChart className="mr-2 h-5 w-5" />,
       description: 'System analytics, usage metrics and growth trends',
-      minRole: 'analyst'
+      permission: Permission.VIEW_ANALYTICS
     },
     {
       href: '/admin/moderation',
       label: 'Content Moderation',
       icon: <AlertCircle className="mr-2 h-5 w-5" />,
       description: 'Review and moderate user-generated content',
-      minRole: 'content_moderator'
+      permission: Permission.MODERATE_CONTENT
     },
   ];
   
-  // Filter links based on user role
-  const roleHierarchy: Record<UserRole, number> = {
-    'user': 0,
-    'analyst': 1,
-    'content_moderator': 2,
-    'super_admin': 3
-  };
-  
+  // Filter links based on user permissions
   const filteredLinks = adminLinks.filter(link => {
-    const linkMinRole = link.minRole as UserRole;
-    return userRole && roleHierarchy[userRole] >= roleHierarchy[linkMinRole];
+    return userRole && hasPermission(userRole, link.permission);
   });
 
   return (
