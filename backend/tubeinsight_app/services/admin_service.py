@@ -1,8 +1,15 @@
 # backend/tubeinsight_app/services/admin_service.py
 
 from datetime import datetime
-from flask import g
-from .supabase_service import get_supabase_client
+from flask import g, current_app
+from supabase import Client
+from ..config import SUPABASE_URL, SUPABASE_SERVICE_KEY
+from ..exceptions import InvalidRoleError
+from typing import List, Dict, Any, Optional
+
+def get_supabase_client() -> Client:
+    from supabase import create_client
+    return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 def log_admin_action(action_type, target_type, target_id=None, details=None):
     """Log an admin action to the audit log"""
@@ -20,7 +27,6 @@ def log_admin_action(action_type, target_type, target_id=None, details=None):
         supabase.table('admin_audit_logs').insert(audit_data).execute()
     except Exception as e:
         # Just log the error but don't fail the main operation
-        from flask import current_app
         current_app.logger.error(f"Failed to log admin action: {str(e)}")
 
 def get_user_profile(user_id):
@@ -74,16 +80,6 @@ def get_api_usage_stats(start_date=None, end_date=None):
         
     return query.execute()
 
-from typing import List, Dict, Any, Optional
-from datetime import datetime
-from supabase import Client
-from ..config import SUPABASE_URL, SUPABASE_SERVICE_KEY
-from ..exceptions import InvalidRoleError
-
-def get_supabase_client() -> Client:
-    from supabase import create_client
-    return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
 def get_all_users(page: int = 1, per_page: int = 10, role_filter: Optional[str] = None, 
                 status_filter: Optional[str] = None, search: Optional[str] = None) -> Dict[str, Any]:
     """
@@ -100,7 +96,6 @@ def get_all_users(page: int = 1, per_page: int = 10, role_filter: Optional[str] 
         Dictionary containing users and pagination info
     """
     try:
-        from flask import current_app
         supabase = get_supabase_client()
         
         # First, get profiles with pagination
@@ -150,7 +145,6 @@ def get_all_users(page: int = 1, per_page: int = 10, role_filter: Optional[str] 
         }
         
     except Exception as e:
-        from flask import current_app
         current_app.logger.error(f"Error in get_all_users: {str(e)}")
         raise
 
@@ -195,33 +189,3 @@ def update_user_role(user_id: str, new_role: str) -> Dict[str, Any]:
     except Exception as e:
         current_app.logger.error(f"Error updating user role: {str(e)}")
         raise
-
-def log_admin_action(admin_id: str, action: str, target_type: str, target_id: str, 
-                    details: Optional[Dict] = None) -> None:
-    """
-    Log an admin action for auditing
-    
-    Args:
-        admin_id: ID of the admin performing the action
-        action: Action performed (e.g., 'update_role', 'suspend_user')
-        target_type: Type of target (e.g., 'user', 'content')
-        target_id: ID of the target
-        details: Additional details about the action
-    """
-    try:
-        supabase = get_supabase_client()
-        
-        log_entry = {
-            'admin_id': admin_id,
-            'action': action,
-            'target_type': target_type,
-            'target_id': target_id,
-            'details': details or {},
-            'ip_address': request.remote_addr if request else None,
-            'user_agent': request.headers.get('User-Agent') if request else None
-        }
-        
-        supabase.table('admin_audit_log').insert(log_entry).execute()
-        
-    except Exception as e:
-        current_app.logger.error(f"Failed to log admin action: {str(e)}")

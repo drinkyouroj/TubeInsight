@@ -5,7 +5,7 @@ import traceback
 from ..middleware.admin_middleware import admin_required
 from ..middleware.role_permissions import Permissions, UserRole, can_modify_user
 from ..services.admin_service import (
-    get_all_users, get_user_details, update_user_role, update_user_status
+    get_all_users, get_user_profile, update_user_role, update_user_status
 )
 from ..services.supabase_service import get_supabase_client
 
@@ -111,12 +111,12 @@ def get_users():
 def get_user_details(user_id):
     """Get detailed information about a single user"""
     try:
-        user_data = get_user_profile(user_id)
+        user_data_response = get_user_profile(user_id)
         
-        if not user_data:
+        if not user_data_response.data:
             return jsonify({'error': 'User not found'}), 404
             
-        return jsonify(user_data)
+        return jsonify(user_data_response.data)
     except Exception as e:
         current_app.logger.error(f"Error getting user details: {str(e)}")
         return jsonify({'error': f'Failed to get user details: {str(e)}'}), 500
@@ -157,7 +157,7 @@ def update_user_role_route(user_id):
         
         return jsonify({
             'message': f'User role updated to {new_role}',
-            'user': result.data[0] if result.data else None
+            'user': result.data[0] if result.data and isinstance(result.data, list) and len(result.data) > 0 else None
         })
     except Exception as e:
         current_app.logger.error(f"Error updating user role: {str(e)}")
@@ -200,7 +200,7 @@ def update_user_status_route(user_id):
         
         return jsonify({
             'message': f'User status updated to {new_status}',
-            'user': result.data[0] if result.data else None
+            'user': result.data[0] if result.data and isinstance(result.data, list) and len(result.data) > 0 else None
         })
     except Exception as e:
         current_app.logger.error(f"Error updating user status: {str(e)}")
