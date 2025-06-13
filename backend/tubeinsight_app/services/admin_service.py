@@ -11,41 +11,43 @@ def get_supabase_client() -> Client:
     from supabase import create_client
     return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-def log_admin_action(action_type, target_type, target_id=None, details=None):
-    """Log an admin action to the audit log"""
+def log_admin_action(actor_id: str, action: str, target_user_id: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
+    """Logs an admin action to the audit log."""
+    # Ensure log_entry is defined early for use in exception logging if needed
+    log_entry = {
+        'actor_user_id': actor_id,
+        'action': action,
+        'target_user_id': target_user_id,
+        'details': details if details is not None else {} 
+    }
     try:
-        supabase = get_supabase_client()
+        supabase_client = get_supabase_client()
+        current_app.logger.debug(f"Attempting to log admin action: {log_entry} with returning=minimal")
         
-        audit_data = {
-            'admin_id': g.user_id,
-            'action_type': action_type,
-            'target_type': target_type,
-            'target_id': target_id,
-            'details': details or {}
-        }
+        # Use returning="minimal" to avoid serialization issues
+        result = supabase_client.table('admin_audit_logs').insert(log_entry, returning="minimal").execute()
         
-        supabase.table('admin_audit_logs').insert(audit_data).execute()
+        if hasattr(result, 'error') and result.error is not None:
+            error_message = f"Code: {result.error.code}, Message: {result.error.message}, Details: {getattr(result.error, 'details', '')}, Hint: {getattr(result.error, 'hint', '')}"
+            current_app.logger.error(f"Failed to log admin action (with returning=minimal). Supabase error: {error_message}. Log entry: {log_entry}")
+        else:
+            # For returning="minimal", a successful insert might not populate result.data extensively.
+            status_code = getattr(result, 'status_code', None)
+            if status_code and 200 <= status_code < 300:
+                 current_app.logger.info(f"Admin action logged successfully (with returning=minimal, status: {status_code}): {action} by {actor_id} for target {target_user_id}")
+            elif not hasattr(result, 'error') or result.error is None:
+                 current_app.logger.info(f"Admin action logged successfully (with returning=minimal, no error reported, status unknown): {action} by {actor_id} for target {target_user_id}")
+            else:
+                current_app.logger.warning(f"Admin action log attempt (with returning=minimal) resulted in an unexpected response structure or non-success status. Response: {result}. Log entry: {log_entry}")
+
     except Exception as e:
-        # Just log the error but don't fail the main operation
-        current_app.logger.error(f"Failed to log admin action: {str(e)}")
+        current_app.logger.error(f"Exception in log_admin_action (with returning=minimal): {e}. Log entry: {log_entry}", exc_info=True)
+        # Do not re-raise, as per original design to not block main operation.
 
 def get_user_profile(user_id):
     """Get a user's profile"""
     supabase = get_supabase_client()
     return supabase.table('profiles').select('*').eq('id', user_id).single().execute()
-
-def update_user_role(user_id, new_role):
-    """Update a user's role"""
-    supabase = get_supabase_client()
-    result = supabase.table('profiles').update({
-        'role': new_role,
-        'updated_at': datetime.now().isoformat()
-    }).eq('id', user_id).execute()
-    
-    # Log admin action
-    log_admin_action('update_role', 'profiles', user_id, {'new_role': new_role})
-    
-    return result
 
 def update_user_status(user_id, new_status, reason=None):
     """Update a user's status (active, suspended, banned)"""
@@ -60,8 +62,8 @@ def update_user_status(user_id, new_status, reason=None):
     
     result = supabase.table('profiles').update(update_data).eq('id', user_id).execute()
     
-    # Log admin action
-    log_admin_action('update_status', 'profiles', user_id, {
+    # Log admin action with updated function signature
+    log_admin_action(g.user_id, 'update_status', user_id, {
         'new_status': new_status,
         'reason': reason
     })
@@ -183,6 +185,9 @@ def update_user_role(user_id: str, new_role: str) -> Dict[str, Any]:
             
         if not response.data:
             raise ValueError("Failed to update user role")
+        
+        # Log admin action with updated function signature
+        log_admin_action(g.user_id, 'update_role', user_id, {'new_role': new_role})
             
         return response.data[0]
         
