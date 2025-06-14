@@ -96,15 +96,13 @@ export default async function DashboardPage() {
               <div className="h-4 w-3/4 rounded-md bg-muted"></div>
               <div className="h-4 w-1/2 rounded-md bg-muted"></div>
             </div>
-          ) : latestAnalysis && latestAnalysis.videos ? (
+          ) : latestAnalysis && latestAnalysis.videos && latestAnalysis.videos.length > 0 ? (
             <div className="flex items-center space-x-4">
-              {latestAnalysis.videos[0].thumbnail_url && (
-                <img
-                  src={latestAnalysis.videos[0].thumbnail_url}
-                  alt={latestAnalysis.videos[0].video_title || 'Video Thumbnail'}
-                  className="w-24 h-auto rounded-md"
-                />
-              )}
+              <img
+                src={latestAnalysis.videos[0].thumbnail_url || 'https://azure-adequate-krill-31.mypinata.cloud/ipfs/bafkreidzflne3pudnxvy4qgvowchd4tuxebxryotdidhxy73x7nbsuqafu'}
+                alt={latestAnalysis.videos[0].video_title || 'Video Thumbnail'}
+                className="w-24 h-auto rounded-md"
+              />
               <div>
                 <h3 className="text-lg font-semibold">
                   {latestAnalysis.videos[0].video_title || 'Untitled Video'}
