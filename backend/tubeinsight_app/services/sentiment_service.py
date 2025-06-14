@@ -58,7 +58,8 @@ def process_video_analysis(video_url: str, user_id: str) -> dict:
     video_record = supabase_service.get_or_create_video(
         video_id,
         video_details.get('title'),
-        video_details.get('channel_title')
+        video_details.get('channel_title'),
+        video_details.get('snippet', {}).get('thumbnails', {}).get('high', {}).get('url')
     )
     if not video_record:
         current_app.logger.error(f"Failed to save or update video record for video_id: {video_id}")

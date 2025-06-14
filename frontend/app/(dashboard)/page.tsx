@@ -24,6 +24,28 @@ export default async function DashboardPage() {
     redirect('/login'); 
   }
 
+  const { data: latestAnalysis, error: analysisError } = await supabase
+    .from('analyses')
+    .select(`
+      analysis_id,
+      youtube_video_id,
+      total_comments_analyzed,
+      analysis_timestamp,
+      videos (
+        video_title,
+        thumbnail_url
+      )
+    `)
+    .eq('user_id', user.id)
+    .order('analysis_timestamp', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (analysisError) {
+    console.error('Error fetching latest analysis:', analysisError);
+    // Handle error, maybe show a message or fallback UI
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center">
@@ -53,11 +75,37 @@ export default async function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-dashed border-border bg-background/50 p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Your latest video analysis summary and key sentiment scores will appear here.
-            </p>
-          </div>
+          {latestAnalysis && latestAnalysis.videos ? (
+            <div className="flex items-center space-x-4">
+              {latestAnalysis.videos[0].thumbnail_url && (
+                <img
+                  src={latestAnalysis.videos[0].thumbnail_url}
+                  alt={latestAnalysis.videos[0].video_title || 'Video Thumbnail'}
+                  className="w-24 h-auto rounded-md"
+                />
+              )}
+              <div>
+                <h3 className="text-lg font-semibold">
+                  {latestAnalysis.videos[0].video_title || 'Untitled Video'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Analyzed on:{' '}
+                  {new Date(latestAnalysis.analysis_timestamp).toLocaleDateString()}
+                </p>
+                <Link href={`/analysis/${latestAnalysis.analysis_id}`}>
+                  <Button variant="link" className="px-0 mt-2">
+                    View Full Analysis <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-border bg-background/50 p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Your latest video analysis summary and key sentiment scores will appear here.
+              </p>
+            </div>
+          )}
         </CardContent>
         <CardFooter>
             <Link href="/history">

@@ -1,0 +1,4 @@
+ALTER TABLE public.analyses
+DROP COLUMN IF EXISTS thumbnail_url;
+ALTER TABLE public.videos
+ADD COLUMN thumbnail_url TEXT;

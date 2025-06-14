@@ -17,7 +17,7 @@ def get_supabase_client() -> SupabaseClient:
     return supabase_client
 
 # --- Video related functions ---
-def get_or_create_video(video_id: str, video_title: str | None, channel_title: str | None) -> dict | None:
+def get_or_create_video(video_id: str, video_title: str | None, channel_title: str | None, thumbnail_url: str | None) -> dict | None:
     """
     Retrieves an existing video record from the 'videos' table or creates a new one.
     Updates the last_cached_comment_retrieval_timestamp.
@@ -26,6 +26,7 @@ def get_or_create_video(video_id: str, video_title: str | None, channel_title: s
         video_id: The YouTube video ID.
         video_title: The title of the video.
         channel_title: The title of the channel.
+        thumbnail_url: The thumbnail URL of the video.  
 
     Returns:
         The video record (dictionary) or None if an error occurs.
@@ -68,7 +69,8 @@ def get_or_create_video(video_id: str, video_title: str | None, channel_title: s
                 'video_title': video_title if video_title is not None else existing_video_data.get('video_title'),
                 'channel_title': channel_title if channel_title is not None else existing_video_data.get('channel_title'),
                 'last_cached_comment_retrieval_timestamp': current_timestamp,
-                'updated_at': current_timestamp
+                'updated_at': current_timestamp,
+                'thumbnail_url': thumbnail_url if thumbnail_url is not None else existing_video_data.get('thumbnail_url')
             }
             update_response = supabase.table('videos').update(update_data).eq('youtube_video_id', video_id).execute()
             
@@ -93,7 +95,8 @@ def get_or_create_video(video_id: str, video_title: str | None, channel_title: s
                 'channel_title': channel_title,
                 'last_cached_comment_retrieval_timestamp': current_timestamp,
                 'created_at': current_timestamp,
-                'updated_at': current_timestamp
+                'updated_at': current_timestamp,
+                'thumbnail_url': thumbnail_url
             }
             create_response = supabase.table('videos').insert(insert_data).execute()
 
