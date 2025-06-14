@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
+import { useRouter } from 'next/navigation';
 
 // Import permissions system
 import { UserRole, Permission, hasPermission, canModifyUser } from '@/utils/permissions';
@@ -47,12 +48,15 @@ export default function AdminUsersPage() {
   const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  const router = useRouter();
+
   const fetchCurrentUserRole = useCallback(async () => {
     try {
       // Get session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error('Not authenticated');
+        router.push('/login?redirect=/admin/users');
+        return null; // Return null to prevent further execution
       }
       
       setCurrentUserId(session.user.id);
@@ -101,7 +105,8 @@ export default function AdminUsersPage() {
       
       const session = await supabase.auth.getSession();
       if (!session.data.session) {
-        throw new Error('Not authenticated');
+        router.push('/login?redirect=/admin/users');
+        return; // Return to prevent further execution
       }
       
       const response = await fetch(url.toString(), {
@@ -142,7 +147,7 @@ export default function AdminUsersPage() {
       
       // If it's an authentication error, redirect to login
       if (err?.status === 401) {
-        window.location.href = '/login?redirect=/admin/users';
+        router.push('/login?redirect=/admin/users');
       }
     } finally {
       setLoading(false);
@@ -167,7 +172,8 @@ export default function AdminUsersPage() {
       // Get fresh session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error('Not authenticated');
+        router.push('/login?redirect=/admin/users');
+        return; // Return to prevent further execution
       }
       
       // Log the token being used (first 10 chars only for security)
