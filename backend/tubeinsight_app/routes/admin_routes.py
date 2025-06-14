@@ -157,7 +157,7 @@ def update_user_role_route(user_id):
         
         return jsonify({
             'message': f'User role updated to {new_role}',
-            'user': result if result else None
+            'user': result
         })
     except Exception as e:
         current_app.logger.error(f"Error updating user role: {str(e)}")
