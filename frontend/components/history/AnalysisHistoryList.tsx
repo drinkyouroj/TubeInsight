@@ -70,7 +70,7 @@ export default function AnalysisHistoryList({
         <p className="mb-4 text-sm text-muted-foreground">
           You haven't analyzed any videos. Start by analyzing a video.
         </p>
-        <Link href="/analyze" legacyBehavior passHref>
+        <Link href="/analyze" passHref>
           <Button size="sm">
             <Youtube className="mr-2 h-4 w-4" />
             Analyze Your First Video
@@ -89,10 +89,8 @@ export default function AnalysisHistoryList({
               className="truncate text-lg font-semibold text-foreground hover:text-primary sm:text-xl"
               title={analysis.videoTitle || 'Untitled Video'} // Use direct videoTitle
             >
-              <Link href={`/analysis/${analysis.analysisId}`} legacyBehavior>
-                <a className="hover:underline">
-                  {analysis.videoTitle || `Analysis for Video ID: ${analysis.videoId}`} {/* Use direct videoTitle and videoId */}
-                </a>
+              <Link href={`/analysis/${analysis.analysisId}`} className="hover:underline">
+                {analysis.videoTitle || `Analysis for Video ID: ${analysis.videoId}`} {/* Use direct videoTitle and videoId */}
               </Link>
             </CardTitle>
             <CardDescription className="flex items-center text-xs text-muted-foreground">
@@ -109,7 +107,7 @@ export default function AnalysisHistoryList({
             {/* <p className="text-sm text-muted-foreground">Overall: <span className="font-medium text-green-600">Positive</span></p> */}
           </CardContent>
           <CardFooter className="mt-auto border-t bg-muted/30 px-4 py-3">
-            <Link href={`/analysis/${analysis.analysisId}`} legacyBehavior passHref>
+            <Link href={`/analysis/${analysis.analysisId}`} passHref>
               <Button variant="ghost" size="sm" className="w-full justify-center text-sm">
                 View Details
                 <ChevronRight className="ml-2 h-4 w-4" />

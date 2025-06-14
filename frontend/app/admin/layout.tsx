@@ -19,8 +19,6 @@ export default function AdminLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Navbar will be displayed at the top of all admin pages */}
-      <Navbar />
 
       {/* Main content area for the specific admin page */}
       <main className="flex-grow container mx-auto px-4 py-6 sm:px-6 lg:px-8">

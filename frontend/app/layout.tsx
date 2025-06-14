@@ -6,6 +6,7 @@ import './globals.css'; // Import global styles, including Tailwind directives
 import SupabaseListener from '@/components/auth/SupabaseListener'; // For client-side auth updates
 import SupabaseProvider from '@/contexts/SupabaseProvider'; // To provide Supabase client via context
 import DebugEnv from '@/components/DebugEnv';
+import Navbar from '@/components/layout/Navbar'; // Global Navbar component
 
 // Initialize the Inter font with the 'latin' subset and assign it to a CSS variable
 const inter = Inter({
@@ -51,6 +52,7 @@ export default function RootLayout({
             It can trigger router.refresh() to update UI based on new auth state.
           */}
           <SupabaseListener />
+          <Navbar />
           {/*
             The children prop will be your page content.
             For authenticated routes, this will be further wrapped by (dashboard)/layout.tsx

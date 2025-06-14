@@ -27,8 +27,6 @@ export default function DashboardLayout({
   // for the dashboard section.
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Navbar will be displayed at the top of all dashboard pages */}
-      <Navbar />
 
       {/* Main content area for the specific page */}
       <main className="flex-grow container mx-auto px-4 py-6 sm:px-6 lg:px-8">

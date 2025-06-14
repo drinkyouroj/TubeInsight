@@ -129,14 +129,21 @@ const renderActiveShape = (props: any) => {
   );
 };
 
-const CustomTooltipContent = ({ active, payload }: any) => {
+const CustomTooltipContent = ({ active, payload, data }: any) => {
   if (active && payload && payload.length) {
-    const data = payload[0].payload; // Access the original data point
+    const itemData = payload[0].payload; // Access the original data point
+    
+    // Calculate percentage by getting total from all chart data
+    // The `data` prop contains the full chart data array
+    const chartData = data || [];
+    const total = chartData.reduce((sum: number, item: any) => sum + item.value, 0);
+    const percentage = total > 0 ? ((itemData.value / total) * 100).toFixed(1) : '0.0';
+    
     return (
-      <div className="rounded-lg border bg-background p-2.5 shadow-lg text-sm">
-        <p className="font-bold capitalize" style={{ color: data.fill }}>{`${data.name}`}</p>
-        <p className="text-foreground">{`Comments: ${data.value}`}</p>
-        <p className="text-muted-foreground">{`(${(payload[0].percent * 100).toFixed(1)}%)`}</p>
+      <div className="rounded-lg border border-border bg-background/95 backdrop-blur-sm p-2.5 shadow-lg text-sm">
+        <p className="font-bold capitalize" style={{ color: itemData.fill }}>{`${itemData.name}`}</p>
+        <p className="text-foreground">{`Comments: ${itemData.value}`}</p>
+        <p className="text-muted-foreground">{`(${percentage}%)`}</p>
       </div>
     );
   }
@@ -267,7 +274,7 @@ export default function SentimentPieChart({ data, isLoading = false }: Sentiment
                 <Cell key={`cell-${entry.name}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={1}/>
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltipContent />} />
+            <Tooltip content={<CustomTooltipContent data={chartData} />} />
             <Legend content={<CustomLegendContent />} verticalAlign="bottom" wrapperStyle={{paddingTop: "10px"}} />
           </PieChart>
         </ResponsiveContainer>
