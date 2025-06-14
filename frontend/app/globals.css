@@ -8,37 +8,39 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%; /* Light mode background */
-  --foreground: 222.2 84% 4.9%; /* Light mode text */
+  /* Light Mode (default, will be toggleable) - Earthy, clean, and vibrant */
+  --background: 30 20% 98%; /* Very light, warm off-white */
+  --foreground: 220 20% 20%; /* Dark earthy tone for text */
   
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card: 30 20% 100%; /* White */
+  --card-foreground: 220 20% 20%;
   
-  --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
+  --popover: 30 20% 100%;
+  --popover-foreground: 220 20% 20%;
   
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
+  --primary: 170 70% 35%; /* Vibrant teal */
+  --primary-foreground: 30 20% 98%; /* Light text on primary */
   
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 30 10% 90%; /* Light earthy gray */
+  --secondary-foreground: 220 20% 20%;
   
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted: 30 10% 90%;
+  --muted-foreground: 220 10% 40%;
   
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
+  --accent: 170 70% 35%; /* Same as primary for accent */
+  --accent-foreground: 30 20% 98%;
   
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 0 80% 50%; /* Standard red */
+  --destructive-foreground: 30 20% 98%;
   
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
+  --border: 30 10% 80%;
+  --input: 30 10% 80%;
+  --ring: 170 70% 35%; /* Ring color matches primary */
   
   --radius: 0.5rem; /* Default border radius */
 
-  --chart-green: 130 50% 50%;    /* HSL: hue, saturation, lightness */
+  /* Chart Colors (adjust for light mode if necessary) */
+  --chart-green: 130 50% 50%;
   --chart-gray: 220 10% 65%;
   --chart-blue: 210 70% 55%;
   --chart-red: 0 70% 55%;
@@ -46,34 +48,36 @@
 }
 
 [data-theme="dark"] {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
+  /* Dark Mode (default) - Deep earthy, modern, vibrant highlights */
+  --background: 220 20% 10%; /* Deep earthy dark blue/gray */
+  --foreground: 30 20% 90%; /* Soft light text */
   
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
+  --card: 220 20% 12%; /* Slightly lighter than background for cards */
+  --card-foreground: 30 20% 90%;
   
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
+  --popover: 220 20% 12%;
+  --popover-foreground: 30 20% 90%;
   
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
+  --primary: 170 70% 45%; /* Vibrant teal */
+  --primary-foreground: 220 20% 10%; /* Dark text on primary */
   
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 220 15% 20%; /* Muted earthy gray */
+  --secondary-foreground: 30 20% 90%;
   
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
+  --muted: 220 15% 20%;
+  --muted-foreground: 220 10% 60%;
   
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 170 70% 45%; /* Vibrant teal for accent */
+  --accent-foreground: 220 20% 10%;
   
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 0 70% 40%; /* Muted red for dark mode */
+  --destructive-foreground: 30 20% 90%;
   
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 215 20.2% 65.1%;
+  --border: 220 15% 25%;
+  --input: 220 15% 25%;
+  --ring: 170 70% 45%; /* Ring matches primary */
 
+  /* Chart Colors (adjust for dark mode if necessary) */
   --chart-green: 130 50% 40%;
   --chart-gray: 220 10% 45%;
   --chart-blue: 210 70% 45%;

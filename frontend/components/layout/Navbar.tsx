@@ -19,7 +19,9 @@ import {
   ShieldAlert,
   Users,
   FileBarChart,
-  AlertCircle
+  AlertCircle,
+  Sun,
+  Moon
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 
@@ -54,6 +56,34 @@ function NavbarContent() {
   const [userRole, setUserRole] = useState<UserRole>('user');
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to dark as per user request
+
+  // Effect to read initial theme from localStorage or system preference
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    } else if (systemPrefersDark) {
+      setTheme('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      setTheme('light');
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  }, []);
+
+  // Function to toggle theme
+  const toggleTheme = () => {
+    setTheme((prevTheme) => {
+      const newTheme = prevTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      return newTheme;
+    });
+  };
   
   // Initialize Supabase client
   useEffect(() => {
@@ -264,7 +294,20 @@ function NavbarContent() {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-4">
+            {/* Theme Toggle Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-5 w-5 text-foreground" />
+              ) : (
+                <Moon className="h-5 w-5 text-foreground" />
+              )}
+            </Button>
             {session ? (
               <>
                 <div className="hidden items-center gap-2 md:flex">

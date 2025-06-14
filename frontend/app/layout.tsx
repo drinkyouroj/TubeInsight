@@ -34,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning data-theme="dark">
       {/*
         suppressHydrationWarning is often used when you have dynamic content
         that might differ between server and client render, especially with themes

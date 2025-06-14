@@ -24,27 +24,42 @@ export default async function DashboardPage() {
     redirect('/login'); 
   }
 
-  const { data: latestAnalysis, error: analysisError } = await supabase
-    .from('analyses')
-    .select(`
-      analysis_id,
-      youtube_video_id,
-      total_comments_analyzed,
-      analysis_timestamp,
-      videos (
-        video_title,
-        thumbnail_url
-      )
-    `)
-    .eq('user_id', user.id)
-    .order('analysis_timestamp', { ascending: false })
-    .limit(1)
-    .single();
+  let latestAnalysis = null;
+  let isLoading = true;
+  let analysisError = null;
+
+  try {
+    const { data, error } = await supabase
+      .from('analyses')
+      .select(`
+        analysis_id,
+        youtube_video_id,
+        total_comments_analyzed,
+        analysis_timestamp,
+        videos (
+          video_title,
+          thumbnail_url
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('analysis_timestamp', { ascending: false })
+      .limit(1)
+      .single();
+
+    latestAnalysis = data;
+    analysisError = error;
+  } catch (err) {
+    console.error('Error fetching latest analysis:', err);
+    analysisError = err;
+  } finally {
+    isLoading = false;
+  }
 
   if (analysisError) {
     console.error('Error fetching latest analysis:', analysisError);
     // Handle error, maybe show a message or fallback UI
   }
+
 
   return (
     <div className="space-y-8">
@@ -75,7 +90,13 @@ export default async function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {latestAnalysis && latestAnalysis.videos ? (
+          {isLoading ? (
+            <div className="animate-pulse space-y-4">
+              <div className="h-24 w-full rounded-md bg-muted"></div>
+              <div className="h-4 w-3/4 rounded-md bg-muted"></div>
+              <div className="h-4 w-1/2 rounded-md bg-muted"></div>
+            </div>
+          ) : latestAnalysis && latestAnalysis.videos ? (
             <div className="flex items-center space-x-4">
               {latestAnalysis.videos[0].thumbnail_url && (
                 <img
@@ -114,7 +135,7 @@ export default async function DashboardPage() {
         </CardFooter>
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -159,7 +180,7 @@ export default async function DashboardPage() {
           </CardFooter>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow md:col-span-2">
+        <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center">
               <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" />

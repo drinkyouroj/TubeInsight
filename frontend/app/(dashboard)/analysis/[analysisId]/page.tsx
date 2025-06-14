@@ -11,8 +11,10 @@ import {
 } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { BarChart3, PieChart, MessageSquareText, AlertTriangle, ThumbsUp, ThumbsDown, Meh, Info, ChevronLeft, Lock } from 'lucide-react';
+import { BarChart3, PieChart, MessageSquareText, AlertTriangle, ThumbsUp, ThumbsDown, Meh, Info, ChevronLeft, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Metadata, ResolvingMetadata } from 'next';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useState } from 'react';
 // We are moving the fetch logic into this component, so we don't need fetchAnalysisDetails from lib/api.
 // We still need the AnalysisResult type.
 import { type AnalysisResult } from '@/lib/api';
@@ -232,6 +234,9 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
     }
   };
 
+  // State for collapsible toxic comments section
+  const [isToxicOpen, setIsToxicOpen] = useState(false);
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
@@ -269,24 +274,69 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
         </CardHeader>
         <CardContent className="space-y-6">
           {analysisData.sentimentBreakdown && analysisData.sentimentBreakdown.length > 0 ? (
-            analysisData.sentimentBreakdown.map((summaryItem) => (
-              <Card key={summaryItem.category} className="bg-card/50 dark:bg-slate-900/70">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center text-lg capitalize">
-                    {getSentimentIcon(summaryItem.category)}
-                    {summaryItem.category} Comments
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {summaryItem.count} comments in this category.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {summaryItem.summary || 'No summary available for this category.'}
-                  </p>
-                </CardContent>
-              </Card>
-            ))
+            <>
+              {/* Positive, Neutral, Critical sections */}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {analysisData.sentimentBreakdown
+                  .filter(item => item.category.toLowerCase() !== 'toxic')
+                  .map((summaryItem) => (
+                    <Card key={summaryItem.category} className="bg-card/50 dark:bg-slate-900/70">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center text-lg capitalize">
+                          {getSentimentIcon(summaryItem.category)}
+                          {summaryItem.category} Comments
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          {summaryItem.count} comments in this category.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                          {summaryItem.summary || 'No summary available for this category.'}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+
+              {/* Toxic section (collapsible) */}
+              {analysisData.sentimentBreakdown
+                .filter(item => item.category.toLowerCase() === 'toxic')
+                .map((summaryItem) => (
+                  <Collapsible key={summaryItem.category} open={isToxicOpen} onOpenChange={setIsToxicOpen} className="space-y-2">
+                    <div className="flex items-center justify-between rounded-md border border-destructive bg-destructive/10 px-4 py-3">
+                      <h2 className="text-lg font-semibold flex items-center text-destructive">
+                        {getSentimentIcon(summaryItem.category)}
+                        {summaryItem.category} Comments
+                      </h2>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-9 p-0 text-destructive">
+                          {isToxicOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          <span className="sr-only">Toggle Toxic Comments</span>
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent>
+                      <Card className="bg-card/50 dark:bg-slate-900/70 border-destructive mt-4">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="flex items-center text-lg capitalize">
+                            {getSentimentIcon(summaryItem.category)}
+                            {summaryItem.category} Comments
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            {summaryItem.count} comments in this category.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                            {summaryItem.summary || 'No summary available for this category.'}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+            </>
           ) : (
             <p className="text-center text-muted-foreground">
               No category summaries available for this analysis.
