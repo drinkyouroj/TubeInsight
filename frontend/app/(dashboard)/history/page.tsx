@@ -73,13 +73,25 @@ export default async function HistoryPage() {
       const videoTitle = analysis.videos?.video_title || 
                         analysis.video_title || 
                         `Video: ${analysis.youtube_video_id}`;
+
+      // Extract thumbnail URL from the response, using nested path if available
+      const thumbnailUrl = analysis.videos?.thumbnail_url || 
+                          analysis.thumbnail_url || 
+                          null;
+
+      // Extract channel name from the response, using nested path if available
+      const channelName = analysis.videos?.channel_name || 
+                         analysis.channel_name || 
+                         null;
       
       return {
         analysisId: analysis.analysis_id || analysis.id, // Prefer analysis_id, fallback to id
         videoId: analysis.youtube_video_id,
         analysisTimestamp: analysis.analysis_timestamp || analysis.created_at,
         totalCommentsAnalyzed: analysis.total_comments_analyzed || 0,
-        videoTitle: videoTitle
+        videoTitle: videoTitle,
+        thumbnailUrl: thumbnailUrl,
+        channelName: channelName
       };
     }) || [];
     

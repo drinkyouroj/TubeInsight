@@ -133,6 +133,9 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
       videoTitle: analysisData.videoTitle || analysisData.videos?.video_title || 'Untitled Video',
       analysisTimestamp: analysisData.analysisTimestamp || analysisData.analysis_timestamp || new Date().toISOString(),
       totalCommentsAnalyzed: analysisData.totalCommentsAnalyzed || analysisData.total_comments_analyzed || 0,
+      // Add thumbnailUrl and channelName from videos object if available
+      thumbnailUrl: analysisData.thumbnailUrl || analysisData.videos?.thumbnail_url || null,
+      channelName: analysisData.channelName || analysisData.videos?.channel_name || null,
       sentimentBreakdown: analysisData.sentimentBreakdown || 
         (analysisData.analysis_category_summaries?.map(item => ({
           category: item.category_name,

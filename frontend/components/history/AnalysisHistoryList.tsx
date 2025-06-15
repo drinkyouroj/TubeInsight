@@ -16,6 +16,7 @@ import {
   CalendarDays,
   FileText,
   Youtube, // Added for the empty state button
+  User,
 } from 'lucide-react';
 
 // This type should align with what the history page fetches and passes down.
@@ -25,6 +26,8 @@ export interface AnalysisHistoryItemData {
   analysisTimestamp: string; // Changed from analysis_timestamp (camelCase)
   totalCommentsAnalyzed: number; // Changed from total_comments_analyzed (camelCase)
   videoTitle?: string | null; // Changed from nested videos.video_title, made optional and nullable
+  thumbnailUrl?: string | null; // Added for thumbnail display
+  channelName?: string | null; // Added for channel name display
 }
 
 interface AnalysisHistoryListProps {
@@ -47,6 +50,9 @@ const formatDate = (dateString: string | null | undefined) => {
     return 'Invalid Date';
   }
 };
+
+// Default thumbnail URL to use if none is provided
+const DEFAULT_THUMBNAIL_URL = "https://azure-adequate-krill-31.mypinata.cloud/ipfs/bafkreidzflne3pudnxvy4qgvowchd4tuxebxryotdidhxy73x7nbsuqafu";
 
 export default function AnalysisHistoryList({
   analyses,
@@ -85,23 +91,38 @@ export default function AnalysisHistoryList({
       {analyses.map((analysis) => (
         <Card key={analysis.analysisId} className="flex h-full flex-col overflow-hidden shadow-sm transition-shadow hover:shadow-md">
           <CardHeader className="pb-3">
-            <CardTitle
-              className="truncate text-lg font-semibold text-foreground hover:text-primary sm:text-xl"
-              title={analysis.videoTitle || 'Untitled Video'} // Use direct videoTitle
-            >
-              <Link href={`/analysis/${analysis.analysisId}`} className="hover:underline">
-                {analysis.videoTitle || `Analysis for Video ID: ${analysis.videoId}`} {/* Use direct videoTitle and videoId */}
-              </Link>
-            </CardTitle>
-            <CardDescription className="flex items-center text-xs text-muted-foreground">
-              <CalendarDays className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" />
-              Analyzed: {formatDate(analysis.analysisTimestamp)} {/* Use analysisTimestamp */}
-            </CardDescription>
+            <div className="flex items-start space-x-3">
+              <img 
+                src={analysis.thumbnailUrl || DEFAULT_THUMBNAIL_URL} 
+                alt={`${analysis.videoTitle || "Video"} thumbnail`}
+                className="h-16 w-28 flex-shrink-0 rounded-md object-cover"
+              />
+              <div className="flex-1 min-w-0">
+                <CardTitle
+                  className="truncate text-lg font-semibold text-foreground hover:text-primary sm:text-xl"
+                  title={analysis.videoTitle || 'Untitled Video'}
+                >
+                  <Link href={`/analysis/${analysis.analysisId}`} className="hover:underline">
+                    {analysis.videoTitle || `Analysis for Video ID: ${analysis.videoId}`}
+                  </Link>
+                </CardTitle>
+                {analysis.channelName && (
+                  <div className="flex items-center text-xs text-muted-foreground mt-1">
+                    <User className="mr-1 h-3 w-3" />
+                    <span className="truncate" title={analysis.channelName}>{analysis.channelName}</span>
+                  </div>
+                )}
+                <CardDescription className="flex items-center text-xs text-muted-foreground mt-1">
+                  <CalendarDays className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" />
+                  Analyzed: {formatDate(analysis.analysisTimestamp)}
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="flex-grow space-y-2 pb-4 pt-0">
             <p className="text-sm text-muted-foreground">
               <FileText className="mr-1.5 inline-block h-4 w-4 align-text-bottom" />
-              Comments Processed: <span className="font-medium text-foreground">{analysis.totalCommentsAnalyzed}</span> {/* Use totalCommentsAnalyzed */}
+              Comments Processed: <span className="font-medium text-foreground">{analysis.totalCommentsAnalyzed}</span>
             </p>
             {/* Placeholder for overall sentiment - adapt if you have this data */}
             {/* <p className="text-sm text-muted-foreground">Overall: <span className="font-medium text-green-600">Positive</span></p> */}
