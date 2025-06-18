@@ -1,6 +1,6 @@
 // File: frontend/app/(dashboard)/history/page.tsx
 
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import {
   Card,
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'; // Ensure page is always dynamically rendered
 
 export default async function HistoryPage() {
-  const supabase = createSupabaseServerClient(); 
+  const supabase = createClient(); 
   const {
     data: { session },
   } = await supabase.auth.getSession();

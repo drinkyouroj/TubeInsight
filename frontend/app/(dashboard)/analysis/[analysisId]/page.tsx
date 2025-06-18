@@ -1,7 +1,38 @@
 // File: frontend/app/(dashboard)/analysis/[analysisId]/page.tsx
 
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+
+// Define an interface for the analysis data returned from the API
+interface AnalysisData {
+  videoTitle?: string;
+  analysisTimestamp?: string;
+  totalCommentsAnalyzed?: number;
+  thumbnailUrl?: string | null;
+  channelName?: string | null;
+  sentimentBreakdown?: Array<{
+    category: string;
+    score: number;
+  }>;
+  commentsByDate?: Array<{
+    date: string;
+    count: number;
+  }>;
+  videos?: {
+    video_title?: string;
+    thumbnail_url?: string;
+    channel_name?: string;
+  };
+  analysis_timestamp?: string;
+  total_comments_analyzed?: number;
+  analysis_category_summaries?: Array<{
+    category_name: string;
+    comment_count_in_category: number;
+    summary_text: string;
+  }>;
+  // Add any other top-level properties that might be in your API response
+}
+
 import {
   Card,
   CardHeader,
@@ -39,7 +70,7 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
   // Add debugging for the analysisId
   console.log(`Analysis detail page - Requested analysisId: ${analysisId}`);
 
-  const supabase = createSupabaseServerClient();
+  const supabase = createClient();
   const {
     data: { session }, // Get the session which contains the access_token
   } = await supabase.auth.getSession();
@@ -122,7 +153,7 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
     }
     
     // If we get here, the request was successful
-    analysisData = await response.json();
+    const analysisData: AnalysisData = await response.json();
     console.log('--- BEGIN RAW ANALYSIS DATA ---');
     console.log(JSON.stringify(analysisData, null, 2));
     console.log('--- END RAW ANALYSIS DATA ---');
@@ -144,7 +175,7 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
         })) || [])
     };
 
-    analysisData = transformedData;
+
     
   } catch (error: any) {
     console.error(`Error in AnalysisDetailPage for ID '${analysisId}':`, error);
@@ -186,15 +217,16 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
     );
   }
 
+  // At this point, analysisData is guaranteed to be not null due to the early return above.
   // Prepare data for charts - now using the transformed data
-  const pieChartData: SentimentPieChartDataPoint[] = (analysisData.sentimentBreakdown || []).map(
+  const pieChartData: SentimentPieChartDataPoint[] = (analysisData!.sentimentBreakdown || []).map(
     (item) => ({
       category_name: item.category,
       comment_count_in_category: item.count,
     })
   );
 
-  const barChartData: CommentsByDateDataPoint[] = (analysisData.commentsByDate || []).map(
+  const barChartData: CommentsByDateDataPoint[] = (analysisData!.commentsByDate || []).map(
     (item) => ({
       date: item.date,
       count: item.count,

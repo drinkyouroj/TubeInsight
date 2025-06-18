@@ -1,6 +1,6 @@
 // File: frontend/app/(dashboard)/analyze/page.tsx
 
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import {
   Card,
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AnalyzePage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();

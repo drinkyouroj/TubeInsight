@@ -1,11 +1,11 @@
 // frontend/app/api/admin/users/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 
 export async function GET(req: NextRequest) {
   console.log('[API Route /api/admin/users] Handler invoked.');
-  const supabase = createSupabaseServerClient();
+  const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,7 +1,7 @@
 // File: frontend/app/(dashboard)/page.tsx
 // This is your main dashboard page, protected by middleware.
 
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
@@ -16,7 +16,7 @@ import {
 import { ArrowRight, BarChart3, MessageSquareText, AlertTriangle, CheckCircle2, Youtube } from 'lucide-react'; 
 
 export default async function DashboardPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = createClient();
   // Use getUser() instead of getSession() for server-side auth state
   const { data: { user } } = await supabase.auth.getUser();
 
