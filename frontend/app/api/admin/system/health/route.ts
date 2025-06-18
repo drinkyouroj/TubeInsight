@@ -1,12 +1,30 @@
-import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+
+// This route is compatible with static export
+export const dynamic = 'force-static';
+
+export async function GET() {
+  // In a static export, we can't make authenticated requests to the backend
+  // Return a 501 Not Implemented response for static exports
+  return NextResponse.json(
+    { 
+      error: "This endpoint requires server-side functionality",
+      message: "The /api/admin/system/health endpoint is not available in static export mode. Please use a server environment with dynamic rendering enabled."
+    },
+    { status: 501 }
+  );
+}
+
+// This is the original implementation for reference
+// It's not used in static export mode
+/*
+import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
 export async function GET() {
   try {
     // Create a Supabase client for server component
-    const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
+    const supabase = createClient();
 
     // Verify session exists
     const { data: { session } } = await supabase.auth.getSession();
@@ -49,8 +67,9 @@ export async function GET() {
   } catch (error) {
     console.error('Error in system health API route:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch system health data' }, 
+      { error: 'Failed to check system health' },
       { status: 500 }
     );
   }
 }
+*/

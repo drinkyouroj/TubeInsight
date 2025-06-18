@@ -102,7 +102,7 @@ export default function AnalysisHistoryList({
                   className="truncate text-lg font-semibold text-foreground hover:text-primary sm:text-xl"
                   title={analysis.videoTitle || 'Untitled Video'}
                 >
-                  <Link href={`/analysis/${analysis.analysisId}`} className="hover:underline">
+                  <Link href={`/analysis-client?id=${analysis.analysisId}`} className="hover:underline">
                     {analysis.videoTitle || `Analysis for Video ID: ${analysis.videoId}`}
                   </Link>
                 </CardTitle>
@@ -128,7 +128,7 @@ export default function AnalysisHistoryList({
             {/* <p className="text-sm text-muted-foreground">Overall: <span className="font-medium text-green-600">Positive</span></p> */}
           </CardContent>
           <CardFooter className="mt-auto border-t bg-muted/30 px-4 py-3">
-            <Link href={`/analysis/${analysis.analysisId}`} passHref>
+            <Link href={`/analysis-client?id=${analysis.analysisId}`} passHref>
               <Button variant="ghost" size="sm" className="w-full justify-center text-sm">
                 View Details
                 <ChevronRight className="ml-2 h-4 w-4" />

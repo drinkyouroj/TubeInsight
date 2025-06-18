@@ -1,278 +1,35 @@
 // File: frontend/app/(dashboard)/analysis/[analysisId]/page.tsx
 
-import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
-
-// Define an interface for the analysis data returned from the API
-interface AnalysisData {
-  videoTitle?: string;
-  analysisTimestamp?: string;
-  totalCommentsAnalyzed?: number;
-  thumbnailUrl?: string | null;
-  channelName?: string | null;
-  sentimentBreakdown?: Array<{
-    category: string;
-    score: number;
-  }>;
-  commentsByDate?: Array<{
-    date: string;
-    count: number;
-  }>;
-  videos?: {
-    video_title?: string;
-    thumbnail_url?: string;
-    channel_name?: string;
-  };
-  analysis_timestamp?: string;
-  total_comments_analyzed?: number;
-  analysis_category_summaries?: Array<{
-    category_name: string;
-    comment_count_in_category: number;
-    summary_text: string;
-  }>;
-  // Add any other top-level properties that might be in your API response
-}
-
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import Link from 'next/link';
-import { BarChart3, PieChart, MessageSquareText, AlertTriangle, ThumbsUp, ThumbsDown, Meh, Info, ChevronLeft, Lock } from 'lucide-react';
-import AnalysisSummaryCards from '@/components/analysis/AnalysisSummaryCards';
-
-// We are moving the fetch logic into this component, so we don't need fetchAnalysisDetails from lib/api.
-// We still need the AnalysisResult type.
-import { type AnalysisResult } from '@/lib/api';
-import SentimentPieChart, { type SentimentPieChartDataPoint } from '@/components/charts/SentimentPieChart';
-import CommentsByDateBarChart, { type CommentsByDateDataPoint } from '@/components/charts/CommentsByDateBarChart';
-
-// This Next.js option can sometimes help with build issues on dynamic pages.
+// Mark the page as dynamic
 export const dynamic = 'force-dynamic';
 
-// Define the props for generateMetadata inline.
+// Import the client component
+import AnalysisClient from './client';
+import { notFound } from 'next/navigation';
 
+// Server component that renders the client component
+export default function Page(props: { params?: { analysisId?: string } }) {
+  // Use a more defensive approach to get the analysisId
+  let analysisId: string;
 
-// Define the props for the page component inline.
-type PageProps = {
-  params: Promise<{ analysisId: string }>;
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-};
-
-export default async function AnalysisDetailPage({ params: paramsPromise, searchParams: searchParamsPromise }: PageProps) {
-  const params = await paramsPromise;
-  const analysisId = params.analysisId;
-  
-  // Add debugging for the analysisId
-  console.log(`Analysis detail page - Requested analysisId: ${analysisId}`);
-
-  const supabase = createClient();
-  const {
-    data: { session }, // Get the session which contains the access_token
-  } = await supabase.auth.getSession();
-
-  if (!session) { // Check for session instead of just user
-    redirect(`/login?next=/analysis/${analysisId}`);
-  }
-
-  let analysisData: AnalysisResult | null = null;
-  let fetchError: string | null = null;
-
-  // --- Start of Data Fetching Logic (moved from lib/api.ts) ---
   try {
-    const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
-    if (!backendApiUrl) {
-      throw new Error("Backend API URL is not configured.");
-    }
-
-    const response = await fetch(`${backendApiUrl}/analyses/${analysisId}`, {
-      method: 'GET',
-      headers: {
-        // Use the access_token from the server-side session
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      // Important for Server Components making fetch calls
-      cache: 'no-store', 
-    });
-    
-    // Log the requested URL
-    console.log(`Making API request to: ${backendApiUrl}/analyses/${analysisId}`);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ 
-        message: `HTTP error ${response.status}` 
-      }));
-
-      // Handle 403 Forbidden (user doesn't have access to this analysis)
-      if (response.status === 403) {
-        return (
-          <div className="container py-12">
-            <div className="mx-auto max-w-md rounded-lg border border-amber-200 bg-amber-50 p-8 text-center text-amber-800">
-              <Lock className="mx-auto mb-4 h-12 w-12" />
-              <h2 className="mb-2 text-2xl font-bold">Access Denied</h2>
-              <p className="mb-6">
-                {errorData.message || "You don't have permission to view this analysis."}
-              </p>
-              <Link href="/history">
-                <Button variant="outline" className="inline-flex items-center">
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Back to Your Analyses
-                </Button>
-              </Link>
-            </div>
-          </div>
-        );
+    if (!props.params || !props.params.analysisId) {
+      // Try to extract from path if params isn't available
+      const path = global?.window?.location?.pathname;
+      const match = path?.match(/\/analysis\/([^/]+)/);
+      analysisId = match?.[1] || 'unknown';
+      
+      // If we still can't get it, return 404
+      if (analysisId === 'unknown') {
+        return notFound();
       }
-
-      // Handle 404 Not Found (analysis doesn't exist)
-      if (response.status === 404) {
-        return (
-          <div className="container py-12">
-            <div className="mx-auto max-w-md rounded-lg border border-destructive/20 bg-destructive/5 p-8 text-center text-destructive">
-              <AlertTriangle className="mx-auto mb-4 h-12 w-12" />
-              <h2 className="mb-2 text-2xl font-bold">Analysis Not Found</h2>
-              <p className="mb-6">
-                {errorData.message || "The analysis you're looking for doesn't exist or was removed."}
-              </p>
-              <Link href="/history">
-                <Button variant="outline" className="inline-flex items-center">
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Back to Your Analyses
-                </Button>
-              </Link>
-            </div>
-          </div>
-        );
-      }
-
-      // For all other errors
-      throw new Error(errorData.message || `Failed to fetch analysis details. Status: ${response.status}`);
+    } else {
+      analysisId = props.params.analysisId;
     }
-    
-    // If we get here, the request was successful
-    const analysisData: AnalysisData = await response.json();
-    console.log('--- BEGIN RAW ANALYSIS DATA ---');
-    console.log(JSON.stringify(analysisData, null, 2));
-    console.log('--- END RAW ANALYSIS DATA ---');
-
-    // Transform API response to match frontend expected structure
-    const transformedData = {
-      ...analysisData,
-      videoTitle: analysisData.videoTitle || analysisData.videos?.video_title || 'Untitled Video',
-      analysisTimestamp: analysisData.analysisTimestamp || analysisData.analysis_timestamp || new Date().toISOString(),
-      totalCommentsAnalyzed: analysisData.totalCommentsAnalyzed || analysisData.total_comments_analyzed || 0,
-      // Add thumbnailUrl and channelName from videos object if available
-      thumbnailUrl: analysisData.thumbnailUrl || analysisData.videos?.thumbnail_url || null,
-      channelName: analysisData.channelName || analysisData.videos?.channel_name || null,
-      sentimentBreakdown: analysisData.sentimentBreakdown || 
-        (analysisData.analysis_category_summaries?.map(item => ({
-          category: item.category_name,
-          count: item.comment_count_in_category,
-          summary: item.summary_text
-        })) || [])
-    };
-
-
-    
-  } catch (error: any) {
-    console.error(`Error in AnalysisDetailPage for ID '${analysisId}':`, error);
-    // This is a catch-all for any other errors (network issues, etc.)
-    return (
-      <div className="container py-12">
-        <div className="mx-auto max-w-md rounded-lg border border-destructive/20 bg-destructive/5 p-8 text-center text-destructive">
-          <AlertTriangle className="mx-auto mb-4 h-12 w-12" />
-          <h2 className="mb-2 text-2xl font-bold">Error Loading Analysis</h2>
-          <p className="mb-6">
-            {error.message || 'An error occurred while loading the analysis. Please try again later.'}
-          </p>
-          <Link href="/history">
-            <Button variant="outline" className="inline-flex items-center">
-              <ChevronLeft className="mr-2 h-4 w-4" /> Back to Your Analyses
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
+  } catch (error) {
+    console.error('Error accessing analysisId:', error);
+    analysisId = 'fallback';
   }
-
-  if (!analysisData) {
-    return (
-      <div className="container py-6">
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-6 text-center text-destructive">
-          <AlertTriangle className="mx-auto mb-3 h-12 w-12" />
-          <h2 className="text-xl font-semibold">Analysis Not Found</h2>
-          <p className="mt-2">
-            The analysis you&apos;re looking for doesn&apos;t exist or was removed.
-          </p>
-          <Link href="/history" className="mt-4 inline-block">
-            <Button variant="outline" size="sm" className="inline-flex items-center">
-              <ChevronLeft className="mr-2 h-4 w-4" /> Back to History
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // At this point, analysisData is guaranteed to be not null due to the early return above.
-  // Prepare data for charts - now using the transformed data
-  const pieChartData: SentimentPieChartDataPoint[] = (analysisData!.sentimentBreakdown || []).map(
-    (item) => ({
-      category_name: item.category,
-      comment_count_in_category: item.count,
-    })
-  );
-
-  const barChartData: CommentsByDateDataPoint[] = (analysisData!.commentsByDate || []).map(
-    (item) => ({
-      date: item.date,
-      count: item.count,
-    })
-  );
-
-  const videoTitle = analysisData.videoTitle || 'Untitled Video';
-
-
-
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <Link href="/history">
-            <Button variant="outline" size="sm" className="mb-3 inline-flex items-center">
-              <ChevronLeft className="mr-1.5 h-4 w-4" />
-              Back to History
-            </Button>
-          </Link>
-          <div className="flex items-center space-x-3">
-            <img
-              src={analysisData.thumbnailUrl || "https://azure-adequate-krill-31.mypinata.cloud/ipfs/bafkreidzflne3pudnxvy4qgvowchd4tuxebxryotdidhxy73x7nbsuqafu"}
-              alt={`${videoTitle} thumbnail`}
-              className="flex-shrink-0 rounded-sm object-cover" style={{ width: '320px', height: '180px' }}
-            />
-            <h1 className="truncate text-2xl font-bold text-foreground sm:text-3xl" title={videoTitle}>
-              Analysis: {videoTitle}
-            </h1>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Analyzed on: {new Date(analysisData.analysisTimestamp).toLocaleString()} | Processed: {analysisData.totalCommentsAnalyzed} comments
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-2">
-          <SentimentPieChart data={pieChartData} />
-        </div>
-        <div className="lg:col-span-3">
-          <CommentsByDateBarChart data={barChartData} />
-        </div>
-      </div>
-
-      <AnalysisSummaryCards sentimentBreakdown={analysisData.sentimentBreakdown} />
-    </div>
-  );
+  
+  return <AnalysisClient analysisId={analysisId} />;
 }

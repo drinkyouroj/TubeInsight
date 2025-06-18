@@ -1,0 +1,63 @@
+server {
+
+    listen 443;
+    listen [::]:443;
+    # Replace with your server's domain name or public IP address
+    server_name tubeinsight.unroots.net;
+
+    # Optional: Set a max body size for uploads, if you add that feature
+    # client_max_body_size 20M;
+
+    # Route all API requests to the Flask/Gunicorn backend
+    location /api/admin/ {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Route all API requests to the Flask/Gunicorn backend
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Route all admin requests to the Next.js backend
+    location /v1/admin/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Route all other requests to the Next.js frontend
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # For WebSocket support if your app uses it (e.g., for real-time updates)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # Optional: Add error logging paths
+    error_log /var/log/nginx/tubeinsight_error.log;
+    access_log /var/log/nginx/tubeinsight_access.log;
+
+}
+server {
+
+    listen 80;
+    listen [::]:80;
+    server_name tubeinsight.unroots.net;
+
+
+}

@@ -1,7 +1,10 @@
+'use client';
+
 // File: frontend/app/(dashboard)/history/page.tsx
 
-import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import {
   Card,
   CardHeader,
@@ -10,155 +13,165 @@ import {
   CardContent,
 } from '@/components/ui/Card';
 import { History as HistoryIcon, ListChecks, AlertTriangle, Youtube } from 'lucide-react';
-import type { Metadata } from 'next';
 import AnalysisHistoryList from '@/components/history/AnalysisHistoryList';
 import { type AnalysisHistoryItem } from '@/lib/api'; // Import the type from lib/api
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 
-export const metadata: Metadata = {
-  title: 'Analysis History',
-  description: 'Review your past YouTube video sentiment analyses on TubeInsight.',
-};
+// Mark the page as static for export compatibility
+export const dynamic = 'force-static';
 
-export const dynamic = 'force-dynamic'; // Ensure page is always dynamically rendered
+export default function HistoryPage() {
+  const router = useRouter();
+  const [session, setSession] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [analyses, setAnalyses] = useState<AnalysisHistoryItem[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-export default async function HistoryPage() {
-  const supabase = createClient(); 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    redirect('/login?next=/history');
-  }
-
-  let analyses: AnalysisHistoryItem[] = [];
-  let fetchError: string | null = null;
-
-  // --- Start of Data Fetching Logic (moved from lib/api.ts) ---
-  try {
-    const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
-    if (!backendApiUrl) {
-      throw new Error("Backend API URL is not configured.");
-    }
-    
-    const response = await fetch(`${backendApiUrl}/analyses`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store', // Always fetch fresh data for the history page
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
-        throw new Error(errorData.message || 'Failed to fetch analysis history.');
-    }
-
-    const historyData = await response.json();
-    
-    // Log the raw API response to see the exact format of IDs
-    console.log("Raw API response - first analysis sample:", 
-                historyData.analyses && historyData.analyses.length > 0 
-                ? historyData.analyses[0] 
-                : "No analyses");
-    
-    // Transform backend API response to match what AnalysisHistoryList expects
-    analyses = historyData.analyses?.map((analysis: any) => {
-      console.log('Analysis object:', analysis); // Log full object for debugging
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getSession();
       
-      // Handle nested video title if it exists
-      const videoTitle = analysis.videos?.video_title || 
-                        analysis.video_title || 
-                        `Video: ${analysis.youtube_video_id}`;
-
-      // Extract thumbnail URL from the response, using nested path if available
-      const thumbnailUrl = analysis.videos?.thumbnail_url || 
-                          analysis.thumbnail_url || 
-                          null;
-
-      // Extract channel name from the response, using nested path if available
-      const channelName = analysis.videos?.channel_name || 
-                         analysis.channel_name || 
-                         null;
+      if (!data.session) {
+        router.push('/login?next=/history');
+        return;
+      }
       
-      return {
-        analysisId: analysis.analysis_id || analysis.id, // Prefer analysis_id, fallback to id
-        videoId: analysis.youtube_video_id,
-        analysisTimestamp: analysis.analysis_timestamp || analysis.created_at,
-        totalCommentsAnalyzed: analysis.total_comments_analyzed || 0,
-        videoTitle: videoTitle,
-        thumbnailUrl: thumbnailUrl,
-        channelName: channelName
-      };
-    }) || [];
+      setSession(data.session);
+      fetchAnalysisHistory(data.session);
+    };
     
-    // Add logging to help debug issues
-    console.log("Transformed analyses:", analyses);
-    console.log("Original API response:", historyData);
+    checkAuth();
+  }, [router]);
+  
+  // Function to fetch analysis history
+  const fetchAnalysisHistory = async (userSession: any) => {
+    try {
+      setIsLoading(true);
+      const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000';
+      
+      // Normalize the API URL to avoid double /api segments
+      const baseUrl = backendApiUrl.endsWith('/api') 
+        ? backendApiUrl 
+        : `${backendApiUrl}/api`;
+      
+      const response = await fetch(`${baseUrl}/analyses`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${userSession.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-  } catch (error) {
-    console.error('Error fetching analysis history on page:', error);
-    fetchError = error instanceof Error ? error.message : 'Failed to load analysis history.';
-    analyses = [];
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const historyData = await response.json();
+      
+      // Transform backend API response to match what AnalysisHistoryList expects
+      const transformedAnalyses = historyData.analyses?.map((analysis: any) => {
+        // Handle nested video title if it exists
+        const videoTitle = analysis.videos?.video_title || 
+                          analysis.video_title || 
+                          `Video: ${analysis.youtube_video_id}`;
+
+        // Extract thumbnail URL from the response, using nested path if available
+        const thumbnailUrl = analysis.videos?.thumbnail_url || 
+                            analysis.thumbnail_url || 
+                            null;
+
+        // Extract channel name from the response, using nested path if available
+        const channelName = analysis.videos?.channel_name || 
+                           analysis.channel_name || 
+                           null;
+        
+        return {
+          analysisId: analysis.analysis_id || analysis.id, // Prefer analysis_id, fallback to id
+          videoId: analysis.youtube_video_id,
+          analysisTimestamp: analysis.analysis_timestamp || analysis.created_at,
+          totalCommentsAnalyzed: analysis.total_comments_analyzed || 0,
+          videoTitle: videoTitle,
+          thumbnailUrl: thumbnailUrl,
+          channelName: channelName
+        };
+      }) || [];
+      
+      setAnalyses(transformedAnalyses);
+      setFetchError(null);
+    } catch (error) {
+      console.error('Error fetching analysis history:', error);
+      setFetchError(error instanceof Error ? error.message : 'An unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container py-8">
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </div>
+    );
   }
-  // --- End of Data Fetching Logic ---
-
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center space-x-3">
-          <HistoryIcon className="h-8 w-8 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-            Analysis History
-          </h1>
+    <div className="container py-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Analysis History</h1>
+          <p className="text-gray-600">Review your past YouTube video analyses</p>
         </div>
         <Link href="/analyze">
-          <Button size="sm" className="flex items-center">
-            <Youtube className="mr-2 h-4 w-4" />
+          <Button className="flex items-center gap-2">
+            <Youtube size={16} />
             Analyze New Video
           </Button>
         </Link>
       </div>
 
-      {fetchError && (
-        <Card className="border-destructive bg-destructive/10 text-destructive dark:border-destructive/50 dark:bg-destructive/20">
+      {fetchError ? (
+        <Card className="mb-8 border-destructive/50 bg-destructive/10">
           <CardHeader>
-            <CardTitle className="flex items-center text-base font-semibold sm:text-lg">
-              <AlertTriangle className="mr-2 h-5 w-5" />
-              Could Not Load History
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle size={18} />
+              Error Loading History
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm">{fetchError}</p>
-            <p className="mt-2 text-xs">
-              Please try refreshing the page. If the problem persists, the backend service might be unavailable.
+            <p>{fetchError}</p>
+            <p className="mt-2">
+              Please try refreshing the page or contact support if the problem persists.
             </p>
           </CardContent>
         </Card>
-      )}
-
-      {!fetchError && (
-        <Card className="shadow-lg">
+      ) : analyses.length > 0 ? (
+        <AnalysisHistoryList analyses={analyses} />
+      ) : (
+        <Card className="mb-8 border-muted bg-muted/20">
           <CardHeader>
-            <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                    <ListChecks className="h-6 w-6 text-muted-foreground" />
-                    <CardTitle className="text-lg sm:text-xl">Your Past Analyses</CardTitle>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                    {analyses.length} {analyses.length === 1 ? 'Result' : 'Results'}
-                </span>
-            </div>
-            <CardDescription className="mt-1 text-sm">
-              Review and revisit insights from your previously analyzed videos.
+            <CardTitle className="flex items-center gap-2">
+              <ListChecks size={18} />
+              No Analyses Yet
+            </CardTitle>
+            <CardDescription>
+              You haven't analyzed any YouTube videos yet.
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-0 sm:p-0">
-            <AnalysisHistoryList analyses={analyses} isLoading={false} />
+          <CardContent>
+            <p className="mb-4">
+              Start by analyzing a YouTube video to see sentiment insights and viewer feedback.
+            </p>
+            <Link href="/analyze">
+              <Button className="flex items-center gap-2">
+                <Youtube size={16} />
+                Analyze Your First Video
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       )}

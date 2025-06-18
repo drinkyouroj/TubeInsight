@@ -1,34 +1,53 @@
+'use client';
+
 // File: frontend/app/(dashboard)/analyze/page.tsx
 
-import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter, // Added for potential future use (e.g., tips or links)
+  CardFooter,
 } from '@/components/ui/Card';
-import { Youtube, Search, AlertCircle, Loader } from 'lucide-react'; // Icons
-import VideoUrlInputForm from '@/components/dashboard/VideoUrlInputForm'; // We'll create this component
-import type { Metadata } from 'next';
-import { Suspense } from 'react';
+import { Youtube, Search, AlertCircle, Loader } from 'lucide-react';
+import VideoUrlInputForm from '@/components/dashboard/VideoUrlInputForm';
 
-export const metadata: Metadata = {
-  title: 'Analyze Video',
-  description: 'Analyze comments from a new YouTube video with TubeInsight.',
-};
+export default function AnalyzePage() {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
 
-export default async function AnalyzePage() {
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  useEffect(() => {
+    // Check authentication status on the client side
+    const checkAuth = async () => {
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          router.push('/login?next=/analyze');
+        } else {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        setIsLoading(false);
+      }
+    };
 
-  if (!session) {
-    // Middleware should catch this, but good for direct navigation attempts
-    redirect('/login?next=/analyze');
+    checkAuth();
+  }, [router]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading...</span>
+      </div>
+    );
   }
 
   return (
