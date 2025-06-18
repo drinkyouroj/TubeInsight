@@ -64,12 +64,6 @@ nbproject/
 *.bak
 *.tmp
 
-# generated files
-package-lock.json
-package.json
-postcss.config.mjs
-tsconfig.json
-
 # Logs
 logs
 *.log

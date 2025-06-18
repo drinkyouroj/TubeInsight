@@ -95,7 +95,7 @@ export default function AnalysisHistoryList({
               <img 
                 src={analysis.thumbnailUrl || DEFAULT_THUMBNAIL_URL} 
                 alt={`${analysis.videoTitle || "Video"} thumbnail`}
-                className="h-16 w-28 flex-shrink-0 rounded-md object-cover"
+                className="flex-shrink-0 rounded-sm object-cover" style={{ width: '320px', height: '180px' }}
               />
               <div className="flex-1 min-w-0">
                 <CardTitle

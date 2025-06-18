@@ -215,9 +215,16 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
               Back to History
             </Button>
           </Link>
-          <h1 className="truncate text-2xl font-bold text-foreground sm:text-3xl" title={videoTitle}>
-            Analysis: {videoTitle}
-          </h1>
+          <div className="flex items-center space-x-3">
+            <img
+              src={analysisData.thumbnailUrl || "https://azure-adequate-krill-31.mypinata.cloud/ipfs/bafkreidzflne3pudnxvy4qgvowchd4tuxebxryotdidhxy73x7nbsuqafu"}
+              alt={`${videoTitle} thumbnail`}
+              className="flex-shrink-0 rounded-sm object-cover" style={{ width: '320px', height: '180px' }}
+            />
+            <h1 className="truncate text-2xl font-bold text-foreground sm:text-3xl" title={videoTitle}>
+              Analysis: {videoTitle}
+            </h1>
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Analyzed on: {new Date(analysisData.analysisTimestamp).toLocaleString()} | Processed: {analysisData.totalCommentsAnalyzed} comments
           </p>
