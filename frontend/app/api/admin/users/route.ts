@@ -6,18 +6,20 @@ import { cookies } from "next/headers";
 export async function GET(req: NextRequest) {
   console.log('[API Route /api/admin/users] Handler invoked.');
   const supabase = createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Forward query params for pagination, filtering, etc.
-  const url = new URL(req.url);
-  const backendUrl = process.env.BACKEND_API_URL || "http://localhost:5000";
-  const apiUrl = `${backendUrl}/v1/admin/users${url.search ? url.search : ""}`;
-  console.log(`[API Route /api/admin/users] Fetching from backend: ${apiUrl}`);
-
-  const response = await fetch(apiUrl, {
+  // Forward the request to the backend API
+  const backendApiUrl = process.env.BACKEND_API_URL || 'http://localhost:5000/api';
+  const response = await fetch(`${backendApiUrl}/admin/users`, {
     headers: { Authorization: `Bearer ${session.access_token}` }
   });
 

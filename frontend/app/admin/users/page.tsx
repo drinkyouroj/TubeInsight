@@ -52,20 +52,20 @@ export default function AdminUsersPage() {
 
   const fetchCurrentUserRole = useCallback(async () => {
     try {
-      // Get session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      // Get user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         router.push('/login?redirect=/admin/users');
         return null; // Return null to prevent further execution
       }
       
-      setCurrentUserId(session.user.id);
+      setCurrentUserId(user.id);
       
       // Get user profile to determine role
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .single();
         
       if (profileError) {
@@ -82,43 +82,18 @@ export default function AdminUsersPage() {
     }
   }, []);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (page: number, perPage: number) => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      
-      // Get current user role first
-      await fetchCurrentUserRole();
-      
-      // Construct the base URL
-      const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
-      const url = new URL(`${baseUrl}/v1/admin/users`);
-      
-      // Add query parameters
-      const params = new URLSearchParams();
-      params.append('page', '1');
-      params.append('per_page', '20');
-      
-      url.search = params.toString();
-      
-      console.log('Fetching users from:', url.toString());
-      
-      const session = await supabase.auth.getSession();
-      if (!session.data.session) {
-        router.push('/login?redirect=/admin/users');
-        return; // Return to prevent further execution
-      }
-      
-      const response = await fetch(url.toString(), {
-        headers: {
-          'Authorization': `Bearer ${session.data.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
+      const params = new URLSearchParams({
+        page: String(page),
+        per_page: String(perPage),
       });
-      
+      const response = await fetch(`/api/admin/users?${params.toString()}`);
+
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch users: ${response.status} ${response.statusText}\n${errorText}`);
+        throw new Error(`Failed to fetch users: ${response.status} ${await response.text()}`);
       }
       
       const data: ApiResponse<User> = await response.json();
@@ -164,27 +139,33 @@ export default function AdminUsersPage() {
       setUpdating(prev => ({ ...prev, [`${userId}-${attribute}`]: true }));
       setError(null);
       
-      const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
-      const url = `${baseUrl}/v1/admin/users/${userId}/${attribute}`;
+      const url = `/api/admin/users/${userId}/${attribute}`;
       
       console.log(`Updating ${displayName} for user ${userId} to ${newValue}`, { url });
       
-      // Get fresh session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      // Get user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         router.push('/login?redirect=/admin/users');
         return; // Return to prevent further execution
       }
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        router.push('/login?redirect=/admin/users');
+        return;
+      }
+      const { access_token } = sessionData.session;
       
       // Log the token being used (first 10 chars only for security)
-      const tokenPreview = session.access_token.substring(0, 10) + '...';
+      const tokenPreview = access_token.substring(0, 10) + '...';
       console.log(`Using auth token starting with: ${tokenPreview}`);
       
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${access_token}`,
         },
         body: JSON.stringify({ [attribute]: newValue }),
       });
@@ -215,7 +196,7 @@ export default function AdminUsersPage() {
       console.log(`${displayName} update successful`);
       
       // Refresh the user list
-      await fetchUsers();
+      await fetchUsers(1, 20);
       
       // Show success message
       setError(null);
@@ -238,7 +219,7 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsers(1, 20);
   }, [fetchUsers]);
 
   if (loading && users.length === 0) {
@@ -259,7 +240,7 @@ export default function AdminUsersPage() {
             <Button 
               variant="outline" 
               className="ml-4"
-              onClick={() => fetchUsers()}
+              onClick={() => fetchUsers(1, 20)}
             >
               Retry
             </Button>
@@ -273,7 +254,7 @@ export default function AdminUsersPage() {
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">User Management</h1>
-        <Button onClick={fetchUsers} disabled={loading}>
+        <Button onClick={() => fetchUsers(1, 20)} disabled={loading}>
           Refresh
         </Button>
       </div>

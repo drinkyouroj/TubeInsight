@@ -7,9 +7,19 @@ export async function GET() {
     // Create a Supabase client for server component
     const supabase = createSupabaseServerClient();
 
+    // Verify user exists
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please log in' }, 
+        { status: 401 }
+      );
+    }
+
     // Verify session exists
     const { data: { session } } = await supabase.auth.getSession();
-    
+
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' }, 
@@ -32,8 +42,8 @@ export async function GET() {
     }
 
     // Forward the request to the backend API
-    const backendApiUrl = process.env.BACKEND_API_URL || 'http://localhost:5000';
-    const response = await fetch(`${backendApiUrl}/v1/admin/system/health`, {
+    const backendApiUrl = process.env.BACKEND_API_URL || 'http://localhost:5000/api';
+    const response = await fetch(`${backendApiUrl}/admin/system/health`, {
       headers: {
         'Authorization': `Bearer ${session.access_token}`
       }

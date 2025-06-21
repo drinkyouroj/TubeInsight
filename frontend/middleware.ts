@@ -48,13 +48,11 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session for Server Components.
-  // Important! Before calling `getSession()` or `getUser()`.
+  // Important! Before calling `getUser()` or `getUser()`.
   // This also refreshes the session cookie if needed.
-  await supabase.auth.getUser();
-
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // Define protected routes.
   // These are routes that require authentication.
@@ -76,7 +74,7 @@ export async function middleware(request: NextRequest) {
 
   const isAuthRoute = authRoutes.includes(pathname);
 
-  if (!session && isProtectedRoute) {
+  if (!user && isProtectedRoute) {
     // No session and trying to access a protected route.
     // Redirect to login page.
     // Preserve the intended destination via 'next' query parameter for redirect after login.
@@ -87,7 +85,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (session && isAuthRoute) {
+  if (user && isAuthRoute) {
     // User has a session but is trying to access an authentication route (e.g., /login).
     // Redirect them to the main dashboard page (root).
     return NextResponse.redirect(new URL('/', request.url));
@@ -96,7 +94,7 @@ export async function middleware(request: NextRequest) {
   // Admin route protection
   if (request.nextUrl.pathname.startsWith('/admin')) {
     // Add this check to ensure session and session.user exist
-    if (!session || !session.user) {
+    if (!user) {
       // If no session or user, redirect to login, preserving the intended admin path
       return NextResponse.redirect(new URL(`/login?redirect=${encodeURIComponent(request.nextUrl.pathname)}`, request.url));
     }
@@ -105,7 +103,7 @@ export async function middleware(request: NextRequest) {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .single();
 
       // Role hierarchy

@@ -76,7 +76,6 @@ export default function AdminDashboard() {
 function AdminDashboardContent() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -99,24 +98,14 @@ function AdminDashboardContent() {
     // Skip auth check if supabase client isn't ready yet
     if (!supabase) return;
     
-    const checkAuth = async () => {
+    const checkAuthAndFetchData = async () => {
       try {
         setLoading(true);
         setError(null);
         
         // Fetch session from Supabase
-        const { data, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          setError('Authentication error');
-          router.push('/login?redirect=/admin');
-          return;
-        }
-        
-        const session = data.session;
-        if (!session) {
-          console.log('No active session found');
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
           router.push('/login?redirect=/admin');
           return;
         }
@@ -125,7 +114,7 @@ function AdminDashboardContent() {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')
-          .eq('id', session.user.id)
+          .eq('id', user.id)
           .single();
         
         if (profileError) {
@@ -135,7 +124,7 @@ function AdminDashboardContent() {
         }
         
         if (!profile) {
-          console.error('Profile not found for user:', session.user.id);
+          console.error('Profile not found for user:', user.id);
           setError('User profile not found');
           router.push('/');
           return;
@@ -153,11 +142,6 @@ function AdminDashboardContent() {
         console.log('User authenticated with role:', role);
         setUserRole(role);
         
-        // Fetch system health data if user has permission
-        if (hasPermission(role, Permission.VIEW_SYSTEM_HEALTH)) {
-          fetchSystemHealth();
-        }
-        
       } catch (err: any) {
         console.error('Auth check error:', err?.message || err);
         setError('Authentication error occurred');
@@ -166,14 +150,14 @@ function AdminDashboardContent() {
       }
     };
     
-    checkAuth();
+    checkAuthAndFetchData();
   }, [supabase, router]);  // Include dependencies
 
   useEffect(() => {
     // Skip auth check if supabase client isn't ready yet
     if (!supabase) return;
     
-    const checkAuth = async () => {
+    const checkAuthAndFetchData = async () => {
       try {
         setLoading(true);
         setError(null);
@@ -186,18 +170,8 @@ function AdminDashboardContent() {
         }
         
         // Check if user is logged in
-        const { data, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          setError('Authentication error');
-          router.push('/login?redirect=/admin');
-          return;
-        }
-        
-        const session = data.session;
-        if (!session) {
-          console.log('No active session found');
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
           router.push('/login?redirect=/admin');
           return;
         }
@@ -206,7 +180,7 @@ function AdminDashboardContent() {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')
-          .eq('id', session.user.id)
+          .eq('id', user.id)
           .single();
         
         if (profileError) {
@@ -216,7 +190,7 @@ function AdminDashboardContent() {
         }
         
         if (!profile) {
-          console.error('Profile not found for user:', session.user.id);
+          console.error('Profile not found for user:', user.id);
           setError('User profile not found');
           router.push('/');
           return;
@@ -234,11 +208,6 @@ function AdminDashboardContent() {
         console.log('User authenticated with role:', role);
         setUserRole(role);
         
-        // Fetch system health data
-        if (role === 'super_admin') {
-          fetchSystemHealth();
-        }
-        
       } catch (err: any) {
         console.error('Auth check error:', err?.message || err);
         setError('Authentication error occurred');
@@ -247,48 +216,8 @@ function AdminDashboardContent() {
       }
     };
     
-    checkAuth();
+    checkAuthAndFetchData();
   }, [supabase, router]);
-  
-  const fetchSystemHealth = async () => {
-    try {
-      if (!supabase) {
-        console.error('Cannot fetch system health: Supabase client not initialized');
-        return;
-      }
-      
-      // Get JWT token for authenticated API call
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        throw new Error('No active session');
-      }
-      
-      // Construct backend URL
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api';
-      const apiUrl = `${backendUrl.replace(/\/api$/, '')}/v1/admin/system/health`;
-      
-      console.log('Fetching system health data from:', apiUrl);
-      
-      // Make authenticated API call
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `Bearer ${sessionData.session.access_token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch system health data: ${response.status} ${errorText}`);
-      }
-      
-      const data = await response.json();
-      setHealth(data);
-    } catch (err) {
-      console.error('Error fetching system health:', err);
-      setError('Could not load system health data');
-    }
-  };
   
   if (loading) {
     return (
@@ -374,88 +303,6 @@ function AdminDashboardContent() {
           </Card>
         ))}
       </div>
-      
-      {userRole === 'super_admin' && health && (
-        <div className="mt-8">
-          <h2 className="mb-4 text-2xl font-semibold">System Health</h2>
-          
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {/* User Stats Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Users</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{health.users.total}</div>
-                <div className="text-xs text-muted-foreground">
-                  <span className="text-green-500">{health.users.active} active</span>
-                  {health.users.suspended > 0 && (
-                    <span className="ml-2 text-amber-500">{health.users.suspended} suspended</span>
-                  )}
-                  {health.users.banned > 0 && (
-                    <span className="ml-2 text-red-500">{health.users.banned} banned</span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Database Stats Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Database</CardTitle>
-                <Database className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(health.database.tables).map(([table, count]) => (
-                    <div key={table}>
-                      <div className="text-xs text-muted-foreground">{table}</div>
-                      <div className="text-sm font-medium">{count}</div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* API Usage 24h Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">API Usage (24h)</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(health.api_usage.last_24h).map(([api, count]) => (
-                    <div key={api}>
-                      <div className="text-xs text-muted-foreground">{api}</div>
-                      <div className="text-sm font-medium">{count}</div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* API Usage 7d Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">API Usage (7d)</CardTitle>
-                <ServerCrash className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(health.api_usage.last_7d).map(([api, count]) => (
-                    <div key={api}>
-                      <div className="text-xs text-muted-foreground">{api}</div>
-                      <div className="text-sm font-medium">{count}</div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
