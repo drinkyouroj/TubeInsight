@@ -122,27 +122,34 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
     }
     
     // If we get here, the request was successful
-    analysisData = await response.json();
+    const rawData = await response.json();
     console.log('--- BEGIN RAW ANALYSIS DATA ---');
-    console.log(JSON.stringify(analysisData, null, 2));
+    console.log(JSON.stringify(rawData, null, 2));
     console.log('--- END RAW ANALYSIS DATA ---');
 
-    if (!analysisData) {
+    if (!rawData) {
       throw new Error('No analysis data received from the server');
     }
 
-    // Transform API response to match frontend expected structure
-    const transformedData = {
-      ...analysisData,
-      // Use the direct properties from AnalysisResult
-      videoTitle: analysisData?.videoTitle || 'Untitled Video',
-      analysisTimestamp: analysisData?.analysisTimestamp || new Date().toISOString(),
-      totalCommentsAnalyzed: analysisData?.totalCommentsAnalyzed || 0,
-      // Set default values for additional frontend properties
-      thumbnailUrl: analysisData?.thumbnailUrl || undefined,
-      channelName: analysisData?.channelName || undefined,
-      // Ensure sentimentBreakdown is always an array
-      sentimentBreakdown: analysisData?.sentimentBreakdown || []
+    // Transform API response (snake_case) to match frontend (camelCase)
+    const transformedData: AnalysisResult = {
+      analysisId: rawData.analysis_id,
+      videoId: rawData.youtube_video_id,
+      videoTitle: rawData.videos?.video_title || 'Untitled Video',
+      channelName: rawData.videos?.channel_title || 'Unknown Channel',
+      thumbnailUrl: rawData.videos?.thumbnail_url || undefined, // Assuming thumbnail might be in `videos`
+      analysisTimestamp: rawData.analysis_timestamp,
+      totalCommentsAnalyzed: rawData.total_comments_analyzed,
+      commentsByDate: rawData.commentsByDate.map((d: any) => ({
+        date: d.date,
+        count: d.count,
+      })),
+      sentimentBreakdown: rawData.analysis_category_summaries.map((s: any) => ({
+        category: s.category_name,
+        count: s.comment_count_in_category,
+        summary: s.summary_text,
+      })),
+      overall_sentiment_summary: rawData.overall_sentiment_summary,
     };
 
     analysisData = transformedData;
