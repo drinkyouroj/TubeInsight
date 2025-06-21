@@ -127,21 +127,22 @@ export default async function AnalysisDetailPage({ params: paramsPromise, search
     console.log(JSON.stringify(analysisData, null, 2));
     console.log('--- END RAW ANALYSIS DATA ---');
 
+    if (!analysisData) {
+      throw new Error('No analysis data received from the server');
+    }
+
     // Transform API response to match frontend expected structure
     const transformedData = {
       ...analysisData,
-      videoTitle: analysisData.videoTitle || analysisData.videos?.video_title || 'Untitled Video',
-      analysisTimestamp: analysisData.analysisTimestamp || analysisData.analysis_timestamp || new Date().toISOString(),
-      totalCommentsAnalyzed: analysisData.totalCommentsAnalyzed || analysisData.total_comments_analyzed || 0,
-      // Add thumbnailUrl and channelName from videos object if available
-      thumbnailUrl: analysisData.thumbnailUrl || analysisData.videos?.thumbnail_url || null,
-      channelName: analysisData.channelName || analysisData.videos?.channel_name || null,
-      sentimentBreakdown: analysisData.sentimentBreakdown || 
-        (analysisData.analysis_category_summaries?.map(item => ({
-          category: item.category_name,
-          count: item.comment_count_in_category,
-          summary: item.summary_text
-        })) || [])
+      // Use the direct properties from AnalysisResult
+      videoTitle: analysisData?.videoTitle || 'Untitled Video',
+      analysisTimestamp: analysisData?.analysisTimestamp || new Date().toISOString(),
+      totalCommentsAnalyzed: analysisData?.totalCommentsAnalyzed || 0,
+      // Set default values for additional frontend properties
+      thumbnailUrl: analysisData?.thumbnailUrl || undefined,
+      channelName: analysisData?.channelName || undefined,
+      // Ensure sentimentBreakdown is always an array
+      sentimentBreakdown: analysisData?.sentimentBreakdown || []
     };
 
     analysisData = transformedData;

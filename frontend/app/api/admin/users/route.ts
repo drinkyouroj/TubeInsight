@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
 
   // Forward query params for pagination, filtering, etc.
   const url = new URL(req.url);
-  const backendUrl = process.env.BACKEND_API_URL || "http://localhost:5000/v1";
-  const apiUrl = `${backendUrl}/admin/users${url.search ? url.search : ""}`;
+  const backendUrl = process.env.BACKEND_API_URL || "http://localhost:5000";
+  const apiUrl = `${backendUrl}/v1/admin/users${url.search ? url.search : ""}`;
   console.log(`[API Route /api/admin/users] Fetching from backend: ${apiUrl}`);
 
   const response = await fetch(apiUrl, {

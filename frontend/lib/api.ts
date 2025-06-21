@@ -30,6 +30,8 @@ export interface AnalysisResult {
   videoTitle: string;
   analysisTimestamp: string;
   totalCommentsAnalyzed: number;
+  thumbnailUrl?: string;
+  channelName?: string;
   sentimentBreakdown: Array<{
     category: string;
     count: number;

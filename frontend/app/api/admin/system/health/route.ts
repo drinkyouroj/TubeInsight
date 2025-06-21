@@ -1,12 +1,11 @@
-import { createClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 export async function GET() {
   try {
     // Create a Supabase client for server component
-    const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
+    const supabase = createSupabaseServerClient();
 
     // Verify session exists
     const { data: { session } } = await supabase.auth.getSession();
@@ -34,7 +33,7 @@ export async function GET() {
 
     // Forward the request to the backend API
     const backendApiUrl = process.env.BACKEND_API_URL || 'http://localhost:5000';
-    const response = await fetch(`${backendApiUrl}/admin/system/health`, {
+    const response = await fetch(`${backendApiUrl}/v1/admin/system/health`, {
       headers: {
         'Authorization': `Bearer ${session.access_token}`
       }
