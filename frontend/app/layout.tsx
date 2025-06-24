@@ -2,6 +2,7 @@
 
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css'; // Import global styles, including Tailwind directives
 import SupabaseListener from '@/components/auth/SupabaseListener'; // For client-side auth updates
 import SupabaseProvider from '@/contexts/SupabaseProvider'; // To provide Supabase client via context
@@ -41,6 +42,13 @@ export default function RootLayout({
         or auth states before full hydration.
       */}
       <body className="h-full bg-background font-sans text-foreground antialiased">
+        <Script id="disable-mce-autosize" strategy="beforeInteractive">
+          {`const originalDefine = customElements.define;
+            customElements.define = (name, constructor, options) => {
+              if (name === 'mce-autosize-textarea' && customElements.get(name)) return;
+              originalDefine.call(customElements, name, constructor, options);
+            };`}
+        </Script>
         {/*
           SupabaseProvider makes the Supabase client available via context,
           which can be useful for components deep in the tree or for custom hooks.
