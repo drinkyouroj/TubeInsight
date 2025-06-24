@@ -54,7 +54,6 @@ function NavbarContent() {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('user');
-  const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to dark as per user request
 
@@ -101,8 +100,6 @@ function NavbarContent() {
     
     const getSession = async () => {
       try {
-        setIsLoading(true);
-        
         // Fetch current session
         const { data, error: sessionError } = await supabase.auth.getSession();
         
@@ -142,8 +139,6 @@ function NavbarContent() {
         }
       } catch (error: any) {
         console.error('Unexpected error in getSession:', error?.message || error);
-      } finally {
-        setIsLoading(false);
       }
     };
     
@@ -245,22 +240,6 @@ function NavbarContent() {
   const filteredAdminLinks = adminLinks.filter(link => 
     hasRequiredRole(link.minRole as UserRole)
   );
-
-  if (isLoading) {
-    return (
-      <nav className="border-b border-border bg-background shadow-sm">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Youtube className="mr-2 h-7 w-7 text-red-500" />
-              <span className="text-xl font-bold text-foreground">TubeInsight</span>
-            </div>
-            <div className="h-8 w-20 animate-pulse rounded-md bg-muted"></div> 
-          </div>
-        </div>
-      </nav>
-    );
-  }
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/60">
