@@ -2,10 +2,8 @@
 'use client'; 
 
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client'; 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/Button';
 import {
   LogOut,
@@ -23,19 +21,24 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
-import type { Session } from '@supabase/supabase-js';
+import { useSupabaseAuth } from '@/contexts/SupabaseProvider';
 
 type UserRole = 'user' | 'analyst' | 'content_moderator' | 'super_admin';
 
 // Loading fallback component
 function NavbarLoadingFallback() {
   return (
-    <div className="navbar w-full bg-white shadow-sm px-4 py-3">
-      <div className="animate-pulse flex items-center justify-between w-full">
-        <div className="h-8 w-32 bg-gray-200 rounded"></div>
-        <div className="h-8 w-24 bg-gray-200 rounded"></div>
+    <nav className="border-b border-border bg-background shadow-sm">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between">
+          <div className="flex items-center">
+            <Youtube className="mr-2 h-7 w-7 text-red-500" />
+            <span className="text-xl font-bold text-foreground">TubeInsight</span>
+          </div>
+          <div className="h-8 w-20 animate-pulse rounded-md bg-muted"></div> 
+        </div>
       </div>
-    </div>
+    </nav>
   );
 }
 
@@ -50,12 +53,10 @@ export default function Navbar() {
 
 // Main Navbar content with proper client handling
 function NavbarContent() {
-  const router = useRouter();
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>('user');
+  const { session, userRole, isLoading, signOut } = useSupabaseAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to dark as per user request
+  const router = useRouter();
 
   // Effect to read initial theme from localStorage or system preference
   useEffect(() => {
@@ -64,132 +65,29 @@ function NavbarContent() {
 
     if (savedTheme) {
       setTheme(savedTheme);
-      document.documentElement.setAttribute('data-theme', savedTheme);
+      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
     } else if (systemPrefersDark) {
       setTheme('dark');
-      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.classList.toggle('dark', true);
     } else {
       setTheme('light');
-      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.classList.toggle('dark', false);
     }
-  }, []);
+  }, [theme]);
 
   // Function to toggle theme
   const toggleTheme = () => {
-    setTheme((prevTheme) => {
-      const newTheme = prevTheme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', newTheme);
-      localStorage.setItem('theme', newTheme);
-      return newTheme;
-    });
+    setTheme(prevTheme => (prevTheme === 'dark' ? 'light' : 'dark'));
   };
-  
-  // Initialize Supabase client
-  useEffect(() => {
-    try {
-      const client = createClient();
-      setSupabase(client);
-    } catch (err: any) {
-      console.error('Failed to initialize Supabase client in Navbar:', err?.message || err);
-    }
-  }, []);
-
-  // Only run session check when supabase client is available
-  useEffect(() => {
-    if (!supabase) return;
-    
-    const getSession = async () => {
-      try {
-        // Fetch current session
-        const { data, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Session error in Navbar:', sessionError.message);
-          return;
-        }
-        
-        const currentSession = data.session;
-        console.log('Current session status:', currentSession ? 'Active' : 'None');
-        
-        setSession(currentSession);
-
-        // Fetch user role if session exists
-        if (currentSession?.user?.id) {
-          try {
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', currentSession.user.id)
-              .single();
-              
-            if (profileError) {
-              console.error('Error fetching user role:', profileError.message, profileError.details);
-            } else if (profileData?.role) {
-              console.log('User role fetched:', profileData.role);
-              setUserRole(profileData.role as UserRole);
-            } else {
-              console.warn('No role found for user:', currentSession.user.id);
-            }
-          } catch (error: any) {
-            console.error('Failed to fetch user role:', error?.message || error);
-          }
-        } else {
-          // Reset to default role when no session
-          setUserRole('user');
-        }
-      } catch (error: any) {
-        console.error('Unexpected error in getSession:', error?.message || error);
-      }
-    };
-    
-    getSession();
-
-    // Only set up auth listener if supabase client is available
-    const authListener = supabase ? supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        setSession(newSession);
-        
-        // Update user role when auth state changes
-        if (newSession?.user && supabase) {
-          try {
-            const { data: profileData, error } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', newSession.user.id)
-              .single();
-              
-            if (!error && profileData?.role) {
-              console.log('User role updated to:', profileData.role);
-              setUserRole(profileData.role as UserRole);
-            }
-          } catch (error: any) {
-            console.error('Failed to fetch user role on auth change:', error?.message || error);
-          }
-        } else {
-          // Reset to default role when session is cleared
-          setUserRole('user');
-        }
-      }
-    ) : { data: { subscription: { unsubscribe: () => {} } } };
-
-    return () => {
-      if (authListener?.data?.subscription) {
-        authListener.data.subscription.unsubscribe();
-      }
-    };
-  }, [supabase]);
 
   const handleSignOut = async () => {
     setIsMobileMenuOpen(false);
-    if (supabase) {
-      await supabase.auth.signOut();
-      router.push('/login');
-      router.refresh();
-    } else {
-      console.error('Cannot sign out: Supabase client not initialized');
-    }
+    await signOut();
+    router.push('/login');
+    router.refresh();
   };
 
+  // Navigation links shown when a user is logged in
   const navLinks = [
     { href: '/', label: 'Dashboard', icon: <BarChart2 className="mr-2 h-4 w-4" /> },
     { href: '/analyze', label: 'Analyze Video', icon: <PlusCircle className="mr-2 h-4 w-4" /> },
@@ -240,6 +138,22 @@ function NavbarContent() {
   const filteredAdminLinks = adminLinks.filter(link => 
     hasRequiredRole(link.minRole as UserRole)
   );
+
+  if (isLoading) {
+    return (
+      <nav className="border-b border-border bg-background shadow-sm">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center">
+              <Youtube className="mr-2 h-7 w-7 text-red-500" />
+              <span className="text-xl font-bold text-foreground">TubeInsight</span>
+            </div>
+            <div className="h-8 w-20 animate-pulse rounded-md bg-muted"></div> 
+          </div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/60">
