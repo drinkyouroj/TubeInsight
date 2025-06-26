@@ -23,12 +23,22 @@ export async function GET(req: NextRequest) {
     const per_page = url.searchParams.get('per_page') || '20';
 
     // Forward the request to the backend API
-    const backendApiUrl = process.env.BACKEND_API_URL || 'http://localhost:5000/api';
-    const backendUrl = `${backendApiUrl}/admin/users?page=${page}&per_page=${per_page}`;
+    // Fix: Use NEXT_PUBLIC_BACKEND_API_URL instead of BACKEND_API_URL to match .env.local
+    const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api';
     
-    console.log('Forwarding request to backend:', backendUrl);
+    // Debug log to see what URL we're using
+    console.log('Using backend API URL:', backendApiUrl);
     
-    const response = await fetch(backendUrl, {
+    // Fix: Ensure the URL is properly formatted with /api if needed
+    const formattedBackendUrl = backendApiUrl.endsWith('/api') 
+      ? `${backendApiUrl.replace(/\/api$/, '')}/admin/users?page=${page}&per_page=${per_page}`
+      : `${backendApiUrl}/admin/users?page=${page}&per_page=${per_page}`;
+    
+    console.log('Formatted backend URL:', formattedBackendUrl);
+    
+    console.log('Forwarding request to backend:', formattedBackendUrl);
+    
+    const response = await fetch(formattedBackendUrl, {
       headers: { 
         Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'
