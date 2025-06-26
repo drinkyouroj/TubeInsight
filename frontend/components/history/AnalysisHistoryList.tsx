@@ -18,6 +18,7 @@ import {
   Youtube, // Added for the empty state button
   User,
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 // This type should align with what the history page fetches and passes down.
 export interface AnalysisHistoryItemData {
@@ -39,13 +40,19 @@ interface AnalysisHistoryListProps {
 const formatDate = (dateString: string | null | undefined) => {
   if (!dateString) return 'Date N/A';
   try {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    // Create a stable date format that will be consistent between server and client
+    const date = new Date(dateString);
+    
+    // Use a stable date format that doesn't depend on locale or timezone
+    const year = date.getUTCFullYear();
+    const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][date.getUTCMonth()];
+    const day = date.getUTCDate();
+    
+    // Format time in 24-hour format to avoid AM/PM differences
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    
+    return `${month} ${day}, ${year}, ${hours}:${minutes} UTC`;
   } catch (error) {
     return 'Invalid Date';
   }
@@ -58,6 +65,13 @@ export default function AnalysisHistoryList({
   analyses,
   isLoading = false,
 }: AnalysisHistoryListProps) {
+  const [isClient, setIsClient] = useState(false);
+  
+  // Effect to check if we're on the client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -114,7 +128,11 @@ export default function AnalysisHistoryList({
                 )}
                 <CardDescription className="flex items-center text-xs text-muted-foreground mt-1">
                   <CalendarDays className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" />
-                  Analyzed: {formatDate(analysis.analysisTimestamp)}
+                  {isClient ? (
+                    <>Analyzed: {formatDate(analysis.analysisTimestamp)}</>
+                  ) : (
+                    <>Analyzed: Loading date...</>
+                  )}
                 </CardDescription>
               </div>
             </div>

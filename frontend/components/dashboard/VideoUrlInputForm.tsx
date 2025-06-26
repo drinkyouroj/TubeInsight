@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { AlertCircle, Loader2, Send, YoutubeIcon } from 'lucide-react'; // Icons
-import { useSupabase } from '@/contexts/SupabaseProvider'; // To get Supabase client for token
+import { useSupabaseAuth } from '@/contexts/SupabaseProvider'; // To get Supabase client for token
 
 // Define the expected structure of the API response from your Flask backend
 // This should match the response designed for `POST /api/analyze-video`
@@ -26,7 +26,7 @@ export default function VideoUrlInputForm() {
   
   // Add client initialization state
   const [clientReady, setClientReady] = useState(false);
-  const supabase = useSupabase(); // Get Supabase client from context
+  const { supabase } = useSupabaseAuth(); // Get Supabase client from context
   
   // Check if Supabase client is available on mount
   useEffect(() => {
