@@ -75,14 +75,16 @@ export async function GET(req: NextRequest) {
       console.log('Successfully received data from backend');
       return NextResponse.json(data);
     } catch (fetchError) {
-      console.error('Fetch error:', fetchError.message);
+      const message = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      console.error('Fetch error:', message);
       return NextResponse.json({ 
         error: "Failed to communicate with backend", 
-        details: fetchError.message 
+        details: message 
       }, { status: 500 });
     }
   } catch (error) {
-    console.error('API route error:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('API route error:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
