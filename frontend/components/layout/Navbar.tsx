@@ -56,28 +56,45 @@ function NavbarContent() {
   const { session, userRole, isLoading, signOut } = useSupabaseAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to dark as per user request
+  const [isClient, setIsClient] = useState(false); // Track if we're on client-side
   const router = useRouter();
+
+  // Effect to check if we're on the client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Effect to read initial theme from localStorage or system preference
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (!isClient) return; // Skip on server-side
 
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
-    } else if (systemPrefersDark) {
-      setTheme('dark');
-      document.documentElement.classList.toggle('dark', true);
-    } else {
-      setTheme('light');
-      document.documentElement.classList.toggle('dark', false);
-    }
-  }, [theme]);
+    // Get theme from localStorage or system preference
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    // Determine which theme to use
+    const initialTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+    
+    // Update state
+    setTheme(initialTheme);
+    
+    // Apply theme to document
+    document.documentElement.setAttribute('data-theme', initialTheme);
+    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
+  }, [isClient]); // Only run when isClient changes (once)
 
   // Function to toggle theme
   const toggleTheme = () => {
-    setTheme(prevTheme => (prevTheme === 'dark' ? 'light' : 'dark'));
+    if (!isClient) return; // Safety check
+    
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    // Update state
+    setTheme(newTheme);
+    // Save to localStorage
+    localStorage.setItem('theme', newTheme);
+    // Apply to document
+    document.documentElement.setAttribute('data-theme', newTheme);
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
   const handleSignOut = async () => {
@@ -164,43 +181,47 @@ function NavbarContent() {
             <span>TubeInsight</span>
           </Link>
 
-          <div className="hidden items-center space-x-1 md:flex">
-            {session && navLinks.map((link) => (
-              <Link key={link.label} href={link.href} passHref>
-                <Button variant="ghost" size="sm" asChild={false} className="flex items-center">
-                   {link.icon}{link.label}
-                </Button>
-              </Link>
-            ))}
-            
-            {session && filteredAdminLinks.length > 0 && (
-              <>
-                <div className="mx-2 h-6 w-px bg-border"></div> {/* Divider */}
-                {filteredAdminLinks.map((link) => (
-                  <Link key={link.label} href={link.href} passHref>
-                    <Button variant="ghost" size="sm" asChild={false} className="flex items-center text-primary">
-                       {link.icon}{link.label}
-                    </Button>
-                  </Link>
-                ))}
-              </>
-            )}
-          </div>
+          {isClient && (
+            <div className="hidden items-center space-x-1 md:flex">
+              {session && navLinks.map((link) => (
+                <Link key={link.label} href={link.href} passHref>
+                  <Button variant="ghost" size="sm" asChild={false} className="flex items-center">
+                    {link.icon}{link.label}
+                  </Button>
+                </Link>
+              ))}
+              
+              {session && filteredAdminLinks.length > 0 && (
+                <>
+                  <div className="mx-2 h-6 w-px bg-border"></div> {/* Divider */}
+                  {filteredAdminLinks.map((link) => (
+                    <Link key={link.label} href={link.href} passHref>
+                      <Button variant="ghost" size="sm" asChild={false} className="flex items-center text-primary">
+                        {link.icon}{link.label}
+                      </Button>
+                    </Link>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center space-x-4">
             {/* Theme Toggle Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? (
-                <Sun className="h-5 w-5 text-foreground" />
-              ) : (
-                <Moon className="h-5 w-5 text-foreground" />
-              )}
-            </Button>
+            {isClient && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-5 w-5 text-foreground" />
+                ) : (
+                  <Moon className="h-5 w-5 text-foreground" />
+                )}
+              </Button>
+            )}
             {session ? (
               <>
                 <div className="hidden items-center gap-2 md:flex">
@@ -235,7 +256,7 @@ function NavbarContent() {
         </div>
       </div>
 
-      {isMobileMenuOpen && session && (
+      {isClient && isMobileMenuOpen && session && (
         <div className="border-t border-border bg-background py-2 md:hidden">
           <div className="container mx-auto space-y-1 px-4">
             {navLinks.map((link) => (
