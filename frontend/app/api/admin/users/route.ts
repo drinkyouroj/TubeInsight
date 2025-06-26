@@ -9,11 +9,15 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
+      console.log('Unauthorized: No user found');
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    console.log('User authenticated:', user.email);
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
+      console.log('Unauthorized: No session found');
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -29,42 +33,56 @@ export async function GET(req: NextRequest) {
     // Debug log to see what URL we're using
     console.log('Using backend API URL:', backendApiUrl);
     
-    // Fix: Ensure the URL is properly formatted with /api if needed and use the correct v1 path prefix
-    // The backend route is defined at /v1/admin/users, not /admin/users
-    const formattedBackendUrl = backendApiUrl.endsWith('/api') 
-      ? `${backendApiUrl.replace(/\/api$/, '')}/v1/admin/users?page=${page}&per_page=${per_page}`
-      : `${backendApiUrl}/v1/admin/users?page=${page}&per_page=${per_page}`;
+    // Fix: Ensure we're using the correct path to the backend users endpoint
+    // The Flask blueprint is registered at /v1/admin, so the users endpoint is at /v1/admin/users
+    const baseUrl = backendApiUrl.endsWith('/api') 
+      ? backendApiUrl.replace(/\/api$/, '')
+      : backendApiUrl;
+      
+    const formattedBackendUrl = `${baseUrl}/v1/admin/users`;
+    const fullUrl = `${formattedBackendUrl}?page=${page}&per_page=${per_page}`;
     
-    console.log('Formatted backend URL:', formattedBackendUrl);
+    console.log('Full backend URL:', fullUrl);
     
-    console.log('Forwarding request to backend:', formattedBackendUrl);
+    // Add more verbose debug logging
+    console.log('Session token available:', !!session.access_token);
+    console.log('Token length:', session.access_token?.length);
+    console.log('Forwarding request to backend with auth token');
     
-    const response = await fetch(formattedBackendUrl, {
-      headers: { 
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
+    // Try a direct fetch to the backend with full debugging
+    try {
+      const response = await fetch(fullUrl, {
+        headers: { 
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Backend response status:', response.status);
+      console.log('Backend response status text:', response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Backend response error details:', errorText);
+        return NextResponse.json({ 
+          error: "Backend API error", 
+          status: response.status,
+          details: errorText 
+        }, { status: response.status });
       }
-    });
 
-    if (!response.ok) {
-      console.error('Backend response error:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('Backend error details:', errorText);
-      return NextResponse.json(
-        { error: `Backend error: ${response.status} ${response.statusText}` }, 
-        { status: response.status }
-      );
+      const data = await response.json();
+      console.log('Successfully received data from backend');
+      return NextResponse.json(data);
+    } catch (fetchError) {
+      console.error('Fetch error:', fetchError.message);
+      return NextResponse.json({ 
+        error: "Failed to communicate with backend", 
+        details: fetchError.message 
+      }, { status: 500 });
     }
-
-    const data = await response.json();
-    console.log('Backend response data:', JSON.stringify(data, null, 2));
-    
-    return NextResponse.json(data, { status: 200 });
   } catch (error) {
-    console.error('API route error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' }, 
-      { status: 500 }
-    );
+    console.error('API route error:', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

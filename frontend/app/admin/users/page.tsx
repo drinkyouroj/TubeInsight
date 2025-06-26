@@ -91,25 +91,9 @@ export default function AdminUsersPage() {
         per_page: String(perPage),
       });
       
-      // Get the backend URL directly to bypass the Next.js API route
-      // This matches the pattern found in the memory about admin page API calls
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5000/api';
-      const apiUrl = `${backendUrl.replace(/\/api$/, '')}/v1/admin/users?${params.toString()}`;
-      
-      console.log('Fetching users directly from backend:', apiUrl);
-      
-      // Get session for auth token
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        throw new Error('No active session');
-      }
-      
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `Bearer ${sessionData.session.access_token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Use absolute URL path to ensure we're hitting the correct API route
+      // regardless of basePath configuration
+      const response = await fetch(`/api/admin/users?${params.toString()}`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch users: ${response.status} ${await response.text()}`);
