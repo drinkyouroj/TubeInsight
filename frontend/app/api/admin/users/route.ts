@@ -29,10 +29,11 @@ export async function GET(req: NextRequest) {
     // Debug log to see what URL we're using
     console.log('Using backend API URL:', backendApiUrl);
     
-    // Fix: Ensure the URL is properly formatted with /api if needed
+    // Fix: Ensure the URL is properly formatted with /api if needed and use the correct v1 path prefix
+    // The backend route is defined at /v1/admin/users, not /admin/users
     const formattedBackendUrl = backendApiUrl.endsWith('/api') 
-      ? `${backendApiUrl.replace(/\/api$/, '')}/admin/users?page=${page}&per_page=${per_page}`
-      : `${backendApiUrl}/admin/users?page=${page}&per_page=${per_page}`;
+      ? `${backendApiUrl.replace(/\/api$/, '')}/v1/admin/users?page=${page}&per_page=${per_page}`
+      : `${backendApiUrl}/v1/admin/users?page=${page}&per_page=${per_page}`;
     
     console.log('Formatted backend URL:', formattedBackendUrl);
     
