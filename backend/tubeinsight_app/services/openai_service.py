@@ -18,6 +18,29 @@ def get_openai_client():
         raise RuntimeError("OpenAI client not available.")
     return openai_client
 
+# --- Function to get appropriate model name ---
+def get_model_name(purpose='classification'):
+    """
+    Returns the appropriate model name based on the LLM provider and purpose.
+    
+    Args:
+        purpose: Either 'classification' or 'summarization' to determine which model to use
+    
+    Returns:
+        The model name to use for the specified purpose
+    """
+    llm_provider = current_app.config.get('LLM_PROVIDER', 'openai')
+    
+    if llm_provider == 'ollama':
+        # Use the configured Ollama model for all purposes
+        return current_app.config.get('OLLAMA_MODEL', 'llama2')
+    else:
+        # Use the configured OpenAI models
+        if purpose == 'classification':
+            return OPENAI_MODEL_FOR_CLASSIFICATION
+        else:
+            return OPENAI_MODEL_FOR_SUMMARIZATION
+
 # --- Function for Sentiment Classification ---
 def classify_comment_sentiments_batch(comments: list[dict]) -> list[dict] | None:
     """
@@ -69,9 +92,9 @@ def classify_comment_sentiments_batch(comments: list[dict]) -> list[dict] | None
     user_prompt_content = f"Please classify the sentiment of the following comments:\n{str(comments_for_prompt)}"
 
     try:
-        current_app.logger.info(f"Sending {len(comments_for_prompt)} comments to OpenAI for sentiment classification using model {OPENAI_MODEL_FOR_CLASSIFICATION}.")
+        current_app.logger.info(f"Sending {len(comments_for_prompt)} comments to OpenAI for sentiment classification using model {get_model_name('classification')}.")
         completion = client.chat.completions.create(
-            model=OPENAI_MODEL_FOR_CLASSIFICATION,
+            model=get_model_name('classification'),
             response_format={"type": "json_object"}, # Request JSON output
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -163,9 +186,9 @@ def summarize_comments_by_category(category_name: str, comments_in_category: lis
         user_prompt_content = f"Here are the '{category_name}' comments:\n{comments_text_block}\n\nPlease provide a summary:"
 
     try:
-        current_app.logger.info(f"Sending {len(comments_in_category)} comments from category '{category_name}' to OpenAI for summarization using model {OPENAI_MODEL_FOR_SUMMARIZATION}.")
+        current_app.logger.info(f"Sending {len(comments_in_category)} comments from category '{category_name}' to OpenAI for summarization using model {get_model_name('summarization')}.")
         completion = client.chat.completions.create(
-            model=OPENAI_MODEL_FOR_SUMMARIZATION,
+            model=get_model_name('summarization'),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt_content}

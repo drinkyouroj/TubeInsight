@@ -23,6 +23,11 @@ FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "your-flask-secret-key")
 # OpenAI API Key
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "your-openai-api-key")
 
+# LLM Provider Configuration
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "openai")  # Options: "openai", "ollama"
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama2")  # Default model to use with Ollama
+
 # YouTube Data API v3 Key
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "your-youtube-api-key")
 

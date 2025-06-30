@@ -20,6 +20,7 @@ TubeInsight is a web application designed to help YouTube content creators analy
 * **Backend:** **Python with Flask** - will handle API logic, external service integration, and database interaction.
 * **Database:** Supabase (PostgreSQL) for user authentication, storing video details, cached comments, and analysis results.
 * **AI:** OpenAI API (using model `gpt-4.1`) for sentiment classification and summarization.
+  * **Alternative:** Local Ollama instance for sentiment classification and summarization.
 * **Data Source:** YouTube Data API v3 for fetching video comments and details.
 
 **High-Level Setup & Installation (Conceptual):**
@@ -38,6 +39,9 @@ Detailed setup instructions will depend on the specific project structure. Howev
         * `YOUTUBE_API_KEY`
         * `FLASK_APP` (e.g., `app.py`)
         * `FLASK_ENV` (e.g., `development`)
+        * `LLM_PROVIDER` (Optional, set to `ollama` to use local Ollama instance)
+        * `OLLAMA_BASE_URL` (Optional, default is `http://localhost:11434/v1`)
+        * `OLLAMA_MODEL` (Optional, default is `llama2`)
     * Run database migrations (if managed separately or via Supabase CLI).
     * Start the Flask development server: `flask run`.
 3.  **Frontend Setup (React/Next.js):**
@@ -116,7 +120,15 @@ Your Flask backend will handle API requests, interact with Supabase, and call Op
     SUPABASE_SERVICE_KEY=your_actual_supabase_service_role_key # Secret!
     SUPABASE_JWT_SECRET=your_actual_supabase_jwt_secret # Secret! (from Supabase Dashboard > API > JWT Settings)
 
+    # Choose your LLM provider:
+    # Option 1: OpenAI (default)
     OPENAI_API_KEY=your_actual_openai_api_key
+    
+    # Option 2: Local Ollama instance
+    # LLM_PROVIDER=ollama
+    # OLLAMA_BASE_URL=http://localhost:11434/v1
+    # OLLAMA_MODEL=llama2  # Or any other model you have pulled in Ollama
+
     YOUTUBE_API_KEY=your_actual_youtube_data_api_key
 
     # For CORS, if your frontend runs on port 3000:

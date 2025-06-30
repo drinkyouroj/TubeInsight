@@ -143,14 +143,23 @@ def create_app(config_name=None):
     # OpenAI Client
     if OpenAIClient and app.config.get('OPENAI_API_KEY'):
         try:
-            app.extensions['openai'] = OpenAIClient(api_key=app.config['OPENAI_API_KEY'])
-            app.logger.info("OpenAI client initialized successfully.")
+            if app.config.get('LLM_PROVIDER', 'openai') == 'ollama':
+                # Initialize with Ollama configuration
+                app.extensions['openai'] = OpenAIClient(
+                    base_url=app.config.get('OLLAMA_BASE_URL', 'http://localhost:11434/v1'),
+                    api_key='ollama'  # Required but unused by Ollama
+                )
+                app.logger.info("Ollama client initialized successfully.")
+            else:
+                # Initialize with OpenAI configuration
+                app.extensions['openai'] = OpenAIClient(api_key=app.config['OPENAI_API_KEY'])
+                app.logger.info("OpenAI client initialized successfully.")
         except Exception as e:
-            app.logger.error(f"Error initializing OpenAI client: {e}")
+            app.logger.error(f"Error initializing LLM client: {e}")
     elif not OpenAIClient:
-        app.logger.error("OpenAI client could not be initialized: openai library not found.")
+        app.logger.error("LLM client could not be initialized: openai library not found.")
     else:
-        app.logger.error("OpenAI client could not be initialized: OPENAI_API_KEY missing in config.")
+        app.logger.error("LLM client could not be initialized: OPENAI_API_KEY missing in config.")
 
     # YouTube API Client (Google API Client)
     if build_google_service and app.config.get('YOUTUBE_API_KEY'):
