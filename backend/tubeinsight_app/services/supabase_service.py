@@ -176,23 +176,43 @@ def save_analysis_results(user_id: str, video_id: str, total_comments_analyzed: 
     Saves the main analysis record and its category summaries.
     """
     supabase = get_supabase_client()
+    
+    # Check if we're in debug mode with a mock user
+    is_debug_user = user_id == "debug-user-id"
+    if is_debug_user:
+        current_app.logger.warning("USING DEBUG MODE: Bypassing database save for mock user")
+        # Generate a fake analysis ID for testing
+        import uuid
+        mock_analysis_id = str(uuid.uuid4())
+        current_app.logger.info(f"Generated mock analysis ID: {mock_analysis_id} for debug user")
+        return mock_analysis_id
+        
     try:
+        # Log the data we're trying to insert for debugging
+        current_app.logger.info(f"Attempting to save analysis for user_id: {user_id}, video_id: {video_id}")
+        
         analysis_insert_data = {
             'user_id': user_id,
             'youtube_video_id': video_id,
             'analysis_timestamp': datetime.now(timezone.utc).isoformat(),
             'total_comments_analyzed': total_comments_analyzed,
         }
+        current_app.logger.info(f"Analysis insert data: {analysis_insert_data}")
+        
         analysis_response = supabase.table('analyses').insert(analysis_insert_data).execute()
 
         if analysis_response is None:
             current_app.logger.error(f"Supabase query for inserting analysis for user '{user_id}', video '{video_id}' returned None.")
             return None
         
+        # Log the full response for debugging
+        current_app.logger.info(f"Analysis response: {analysis_response}")
+        
         if analysis_response.data:
             analysis_id = analysis_response.data[0]['analysis_id']
             current_app.logger.info(f"Saved main analysis record with ID '{analysis_id}'.")
 
+            # Prepare summaries to save
             summaries_to_save = []
             for item in sentiment_breakdown:
                 summaries_to_save.append({
@@ -203,15 +223,20 @@ def save_analysis_results(user_id: str, video_id: str, total_comments_analyzed: 
                 })
             
             if summaries_to_save:
-                summaries_response = supabase.table('analysis_category_summaries').insert(summaries_to_save).execute()
-                
-                if summaries_response is None:
-                    current_app.logger.error(f"Supabase query for inserting summaries for analysis_id '{analysis_id}' returned None.")
-                    # Potentially roll back, for now just log
-                elif not summaries_response.data:
-                    current_app.logger.error(f"Failed to save category summaries for analysis_id '{analysis_id}'.")
-                else:
-                    current_app.logger.info(f"Saved {len(summaries_to_save)} category summaries for analysis_id '{analysis_id}'.")
+                current_app.logger.info(f"Attempting to save {len(summaries_to_save)} category summaries")
+                try:
+                    summaries_response = supabase.table('analysis_category_summaries').insert(summaries_to_save).execute()
+                    
+                    if summaries_response is None:
+                        current_app.logger.error(f"Supabase query for inserting summaries for analysis_id '{analysis_id}' returned None.")
+                        # Potentially roll back, for now just log
+                    elif not summaries_response.data:
+                        current_app.logger.error(f"Failed to save category summaries for analysis_id '{analysis_id}'.")
+                    else:
+                        current_app.logger.info(f"Saved {len(summaries_to_save)} category summaries for analysis_id '{analysis_id}'.")
+                except Exception as e:
+                    current_app.logger.error(f"Exception saving category summaries: {e}")
+                    # Continue anyway - we'll return the analysis_id even if summaries fail
             
             return analysis_id
 

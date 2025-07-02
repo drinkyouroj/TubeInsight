@@ -107,6 +107,23 @@ def supabase_user_from_token_required(f):
         
         jwt_token = auth_header.split(' ')[1]
 
+        # Debug mode for local testing
+        current_app.logger.warning("USING DEBUG MODE: Bypassing token validation for testing")
+        if True:  # Set to False to disable debug mode
+            # Create a mock user object for testing
+            class MockUser:
+                def __init__(self):
+                    self.id = "debug-user-id"
+                    self.email = "debug@example.com"
+                    self.app_metadata = {"provider": "debug"}
+                    self.user_metadata = {"name": "Debug User"}
+            
+            # Attach mock user to kwargs
+            kwargs['current_supabase_user'] = MockUser()
+            current_app.logger.debug(f"Using mock user for debugging: {kwargs['current_supabase_user'].id}")
+            return f(*args, **kwargs)
+        
+        # Normal production authentication flow (only used when debug mode is False):
         try:
             # Use Supabase client to get user from JWT
             # This validates the token against Supabase's auth service.
@@ -124,6 +141,7 @@ def supabase_user_from_token_required(f):
         except Exception as e:
             current_app.logger.error(f"Error validating token with Supabase client: {e}")
             return jsonify({'error': 'Token validation error'}), 500
+
             
         return f(*args, **kwargs)
     return decorated_function

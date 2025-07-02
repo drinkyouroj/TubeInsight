@@ -28,8 +28,18 @@ def analyze_video(current_supabase_user: SupabaseUser, **kwargs):
     """
     user_id = current_supabase_user.id
     current_app.logger.info(f"User '{user_id}' attempting to analyze a video.")
-
-    data = request.get_json()
+    
+    # Log raw request data for debugging
+    current_app.logger.info(f"Raw request data: {request.data}")
+    current_app.logger.info(f"Request headers: {dict(request.headers)}")
+    
+    try:
+        data = request.get_json()
+        current_app.logger.info(f"Parsed JSON data: {data}")
+    except Exception as e:
+        current_app.logger.error(f"Error parsing JSON from request: {e}")
+        return jsonify({"error": "Invalid JSON in request body"}), 400
+        
     if not data or 'videoUrl' not in data:
         current_app.logger.error(f"User '{user_id}': Missing 'videoUrl' in request body for /analyze-video.")
         return jsonify({"error": "Missing 'videoUrl' in request body"}), 400
@@ -40,7 +50,9 @@ def analyze_video(current_supabase_user: SupabaseUser, **kwargs):
     
     # Call the sentiment_service to process the analysis
     try:
+        current_app.logger.info(f"Calling sentiment_service.process_video_analysis with URL: {video_url}")
         analysis_result = sentiment_service.process_video_analysis(video_url, user_id)
+        current_app.logger.info(f"Sentiment service returned: {analysis_result}")
         
         if "error" in analysis_result:
             # The service function returns a dict with 'error' and 'status_code'

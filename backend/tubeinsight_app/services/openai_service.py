@@ -93,15 +93,31 @@ def classify_comment_sentiments_batch(comments: list[dict]) -> list[dict] | None
 
     try:
         current_app.logger.info(f"Sending {len(comments_for_prompt)} comments to OpenAI for sentiment classification using model {get_model_name('classification')}.")
-        completion = client.chat.completions.create(
-            model=get_model_name('classification'),
-            response_format={"type": "json_object"}, # Request JSON output
-            messages=[
+        # Check if we're using Ollama or OpenAI to adjust parameters accordingly
+        llm_provider = current_app.config.get('LLM_PROVIDER', 'openai')
+        
+        # Common parameters for both providers
+        params = {
+            "model": get_model_name('classification'),
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt_content}
             ],
-            temperature=0.2, # Lower temperature for more deterministic classification
-        )
+            "temperature": 0.2, # Lower temperature for more deterministic classification
+        }
+        
+        # Add response_format only for OpenAI (not supported by Ollama)
+        if llm_provider != 'ollama':
+            params["response_format"] = {"type": "json_object"}
+        
+        current_app.logger.info(f"Using LLM provider: {llm_provider} with model: {params['model']}")
+        
+        # Add timeout for Ollama to prevent hanging indefinitely
+        if llm_provider == 'ollama':
+            params["timeout"] = 30  # 30 seconds timeout
+            current_app.logger.info("Added timeout for Ollama API call")
+        
+        completion = client.chat.completions.create(**params)
         
         response_content = completion.choices[0].message.content
         if not response_content:
@@ -187,15 +203,30 @@ def summarize_comments_by_category(category_name: str, comments_in_category: lis
 
     try:
         current_app.logger.info(f"Sending {len(comments_in_category)} comments from category '{category_name}' to OpenAI for summarization using model {get_model_name('summarization')}.")
-        completion = client.chat.completions.create(
-            model=get_model_name('summarization'),
-            messages=[
+        # Check if we're using Ollama or OpenAI to adjust parameters accordingly
+        llm_provider = current_app.config.get('LLM_PROVIDER', 'openai')
+        
+        # Common parameters for both providers
+        params = {
+            "model": get_model_name('summarization'),
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt_content}
             ],
-            temperature=0.5, # Higher temperature for more creative/natural summaries
-            max_tokens=150 # Limit summary length
-        )
+            "temperature": 0.5, # Higher temperature for more creative/natural summaries
+        }
+        
+        # Add max_tokens parameter (may not be supported by all Ollama models)
+        if llm_provider != 'ollama':
+            params["max_tokens"] = 150  # Limit summary length
+        
+        # Add timeout for Ollama to prevent hanging indefinitely
+        if llm_provider == 'ollama':
+            params["timeout"] = 30  # 30 seconds timeout
+            current_app.logger.info("Added timeout for Ollama API call")
+        
+        current_app.logger.info(f"Using LLM provider: {llm_provider} with model: {params['model']}")
+        completion = client.chat.completions.create(**params)
         
         summary = completion.choices[0].message.content
         if summary:
