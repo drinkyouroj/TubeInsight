@@ -2,7 +2,7 @@
 
 from flask import current_app
 from supabase import Client as SupabaseClient # For type hinting
-from datetime import datetime, timezone # For handling timestamps
+from datetime import datetime, timezone, timedelta  # For handling timestamps and date ranges
 # from postgrest import APIResponse, APIError # For more specific error type checking if needed
 
 # --- Function to get Supabase Client ---
@@ -276,11 +276,15 @@ def get_comments_by_date_for_video(video_id: str, days_limit: int = 30) -> list[
     """
     supabase = get_supabase_client()
     try:
-        response = supabase.table('comments') \
-            .select('published_at') \
-            .eq('youtube_video_id', video_id) \
-            .order('published_at', desc=True) \
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_limit)
+        response = (
+            supabase.table('comments')
+            .select('published_at')
+            .eq('youtube_video_id', video_id)
+            .gte('published_at', cutoff_date.isoformat())
+            .order('published_at', desc=True)
             .execute()
+        )
 
         if response is None:
             current_app.logger.error(f"Supabase query for fetching comments for date aggregation (video_id: {video_id}) returned None.")
