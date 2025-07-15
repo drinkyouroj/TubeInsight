@@ -1,0 +1,44 @@
+# Environment variables
+.env
+
+# Python cache and virtual environment
+__pycache__/
+*.py[cod]
+*$py.class
+.env.venv
+env/
+venv/
+ENV/
+
+# Database
+*.sqlite3
+*.db
+
+# Logs
+*.log
+
+# Local development
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+
+# Local configuration overrides
+local_settings.py
+
+# Output files
+*.json
+!*.example.json
+
+# Ignore any other .env files except .env.example
+.env.*
+!.env.example

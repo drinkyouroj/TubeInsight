@@ -34,7 +34,17 @@ CREATE DATABASE tubeinsight;
 pip install psycopg2-binary google-api-python-client openai python-dotenv
 ```
 
-3. Create a `.env` file in the scripts directory with your configuration:
+3. Copy the example environment file and update it with your configuration:
+
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit the .env file with your actual configuration
+nano .env  # or use your favorite text editor
+```
+
+Example `.env` file (already set up in `.env.example`):
 
 ```
 # Database configuration
@@ -42,17 +52,19 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=tubeinsight
 DB_USER=postgres
-DB_PASSWORD=your_password
+DB_PASSWORD=your_secure_password
 
 # API Keys
 YOUTUBE_API_KEY=your_youtube_api_key
 OPENAI_API_KEY=your_openai_api_key
 
-# LLM Provider (openai or ollama)
-LLM_PROVIDER=openai
+# LLM Provider Configuration (openai or ollama)
+LLM_PROVIDER=ollama  # or "openai" for OpenAI API
 OLLAMA_BASE_URL=http://localhost:11434/v1
-OLLAMA_MODEL=llama2
+OLLAMA_MODEL=llama2  # or "mistral" if you have that model installed
 ```
+
+**Important**: The `.env` file is in `.gitignore` to prevent sensitive data from being committed to version control. Never commit your actual `.env` file with real passwords or API keys.
 
 4. Initialize the database:
 
