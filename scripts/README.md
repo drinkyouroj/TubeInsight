@@ -31,8 +31,14 @@ CREATE DATABASE tubeinsight;
 2. Install required Python packages:
 
 ```bash
-pip install psycopg2-binary google-api-python-client openai python-dotenv
+pip install -r requirements.txt
 ```
+
+The `requirements.txt` file includes the following dependencies:
+- psycopg2==2.9.10 - PostgreSQL database adapter
+- google-api-python-client - YouTube API client
+- openai - OpenAI API client
+- python-dotenv - Environment variable management
 
 3. Copy the example environment file and update it with your configuration:
 
