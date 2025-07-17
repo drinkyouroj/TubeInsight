@@ -63,6 +63,52 @@ Detailed setup instructions will depend on the specific project structure. Howev
 5.  View the sentiment breakdown, categorized summaries, and other insights on the dashboard.
 6.  Access your past analyses from your user dashboard/history page.
 
+## API Documentation
+
+TubeInsight provides comprehensive API documentation for developers and integrators:
+
+### 📖 Documentation Options
+
+1. **Interactive Swagger UI (Recommended)**
+   ```bash
+   cd docs
+   python3 -m http.server 8080
+   # Open http://localhost:8080/swagger-ui.html
+   ```
+
+2. **Markdown Documentation**
+   - View `docs/api-documentation.md` for complete API reference
+   - Includes authentication, endpoints, examples, and SDK code
+
+3. **OpenAPI Specification**
+   - `docs/openapi.yaml` - Machine-readable API specification
+   - Compatible with code generators and API tools
+
+### 🔗 Key API Endpoints
+
+- **POST /api/analyze-video** - Analyze YouTube video sentiment
+- **GET /api/analysis-history** - Retrieve analysis history
+- **GET /api/analysis-history/{id}** - Get detailed analysis results
+- **GET /api/internal/admin/users** - Admin user management
+- **GET /api/internal/admin/system/health** - System health metrics
+
+### 🔐 Authentication
+
+All API endpoints require Supabase JWT authentication:
+```bash
+curl -H "Authorization: Bearer <your_jwt_token>" \
+     -H "Content-Type: application/json" \
+     https://your-domain.com/api/analyze-video
+```
+
+### 📊 Rate Limits
+
+- Analysis endpoints: 10 requests/minute per user
+- History endpoints: 60 requests/minute per user
+- Admin endpoints: 100 requests/minute per admin
+
+For complete API documentation, see the [`docs/`](./docs/) directory.
+
 ## Running TubeInsight in a Test/Development Environment
 
 This guide outlines the steps to set up and run your TubeInsight application (Flask backend and Next.js frontend) locally for development and testing.

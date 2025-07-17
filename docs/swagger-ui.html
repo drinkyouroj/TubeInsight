@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TubeInsight API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+    <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.9.0/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.9.0/favicon-16x16.png" sizes="16x16" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            background: #fafafa;
+        }
+        .swagger-ui .topbar {
+            background-color: #1f2937;
+        }
+        .swagger-ui .topbar .download-url-wrapper {
+            display: none;
+        }
+        .custom-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .custom-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+        .custom-header p {
+            margin: 0.5rem 0 0 0;
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        .api-info {
+            max-width: 1200px;
+            margin: 0 auto 2rem auto;
+            padding: 0 2rem;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        .info-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+        .info-card h3 {
+            margin: 0 0 1rem 0;
+            color: #1f2937;
+        }
+        .info-card ul {
+            margin: 0;
+            padding-left: 1.5rem;
+        }
+        .info-card li {
+            margin-bottom: 0.5rem;
+        }
+        .auth-example {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+            border: 1px solid #e2e8f0;
+        }
+        #swagger-ui {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="custom-header">
+        <h1>TubeInsight API</h1>
+        <p>Comprehensive REST API for YouTube Video Sentiment Analysis</p>
+    </div>
+
+    <div class="api-info">
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>🚀 Getting Started</h3>
+                <ul>
+                    <li><strong>Base URL:</strong> <code>https://your-domain.com/api</code></li>
+                    <li><strong>Authentication:</strong> Supabase JWT Bearer Token</li>
+                    <li><strong>Content-Type:</strong> <code>application/json</code></li>
+                    <li><strong>API Version:</strong> v1.0.0</li>
+                </ul>
+            </div>
+
+            <div class="info-card">
+                <h3>🔐 Authentication</h3>
+                <p>Include your Supabase JWT token in the Authorization header:</p>
+                <div class="auth-example">
+                    Authorization: Bearer &lt;your_jwt_token&gt;
+                </div>
+                <p><small>Tokens are obtained through the frontend authentication flow.</small></p>
+            </div>
+
+            <div class="info-card">
+                <h3>📊 Core Features</h3>
+                <ul>
+                    <li>Analyze YouTube video sentiment</li>
+                    <li>Retrieve analysis history</li>
+                    <li>Get detailed analysis results</li>
+                    <li>Admin user management</li>
+                    <li>System health monitoring</li>
+                </ul>
+            </div>
+
+            <div class="info-card">
+                <h3>⚡ Rate Limits</h3>
+                <ul>
+                    <li><strong>Analysis:</strong> 10 req/min per user</li>
+                    <li><strong>History:</strong> 60 req/min per user</li>
+                    <li><strong>Admin:</strong> 100 req/min per admin</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="swagger-ui"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            // Build a system
+            const ui = SwaggerUIBundle({
+                url: './openapi.yaml', // Path to your OpenAPI spec
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+                tryItOutEnabled: true,
+                requestInterceptor: (request) => {
+                    // Add any default headers or modify requests here
+                    return request;
+                },
+                responseInterceptor: (response) => {
+                    // Handle responses here
+                    return response;
+                },
+                onComplete: () => {
+                    // Hide the top bar
+                    const topbar = document.querySelector('.topbar');
+                    if (topbar) {
+                        topbar.style.display = 'none';
+                    }
+                },
+                validatorUrl: null, // Disable validator
+                docExpansion: 'list', // Can be 'list', 'full', or 'none'
+                defaultModelsExpandDepth: 1,
+                defaultModelExpandDepth: 1,
+                displayOperationId: false,
+                displayRequestDuration: true,
+                filter: true, // Enable filtering
+                showExtensions: true,
+                showCommonExtensions: true,
+                supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+                persistAuthorization: true // Remember auth between page reloads
+            });
+
+            // Custom styling and behavior
+            ui.preauthorizeApiKey('BearerAuth', 'your_token_here');
+        };
+    </script>
+</body>
+</html>

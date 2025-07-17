@@ -1,0 +1,703 @@
+openapi: 3.0.3
+info:
+  title: TubeInsight API
+  description: |
+    TubeInsight provides a comprehensive REST API for YouTube video sentiment analysis. 
+    The API analyzes YouTube video comments to provide sentiment insights while protecting 
+    content creators from direct exposure to toxic content.
+    
+    ## Authentication
+    All endpoints (except health checks) require authentication using Supabase JWT tokens.
+    Include the token in the Authorization header: `Bearer <token>`
+    
+    ## Rate Limiting
+    - Analysis endpoints: 10 requests/minute per user
+    - History endpoints: 60 requests/minute per user  
+    - Admin endpoints: 100 requests/minute per admin
+  version: 1.0.0
+  contact:
+    name: TubeInsight API Support
+    email: api-support@tubeinsight.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://your-domain.com/api
+    description: Production server
+  - url: http://localhost:3000/api
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Basic health check endpoint (no authentication required)
+      security: []
+      tags:
+        - Utility
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /analyze-video:
+    post:
+      summary: Analyze Video
+      description: Analyzes sentiment of comments for a YouTube video
+      tags:
+        - Video Analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeVideoRequest'
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /analysis-history:
+    get:
+      summary: Get Analysis History
+      description: Retrieves user's analysis history with pagination
+      tags:
+        - Video Analysis
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Analysis history retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisHistoryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /analysis-history/{analysis_id}:
+    get:
+      summary: Get Analysis Details
+      description: Retrieves detailed information about a specific analysis
+      tags:
+        - Video Analysis
+      parameters:
+        - name: analysis_id
+          in: path
+          required: true
+          description: Analysis ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Analysis details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisDetailsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /internal/admin/users:
+    get:
+      summary: Get All Users
+      description: Retrieves paginated list of all users (admin only)
+      tags:
+        - Admin
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: role
+          in: query
+          description: Filter by role
+          schema:
+            type: string
+            enum: [user, admin, super_admin]
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [active, suspended, banned]
+        - name: search
+          in: query
+          description: Search term for name or email
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /internal/admin/users/{user_id}/role:
+    put:
+      summary: Update User Role
+      description: Updates a user's role (admin only)
+      tags:
+        - Admin
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRoleRequest'
+      responses:
+        '200':
+          description: User role updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /internal/admin/users/{user_id}/status:
+    put:
+      summary: Update User Status
+      description: Updates a user's status (admin only)
+      tags:
+        - Admin
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserStatusRequest'
+      responses:
+        '200':
+          description: User status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /internal/admin/system/health:
+    get:
+      summary: System Health
+      description: Retrieves system health metrics (admin only)
+      tags:
+        - Admin
+      responses:
+        '200':
+          description: System health retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemHealthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT token
+
+  schemas:
+    AnalyzeVideoRequest:
+      type: object
+      required:
+        - videoUrl
+      properties:
+        videoUrl:
+          type: string
+          format: uri
+          description: YouTube video URL
+          example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+    SentimentSummary:
+      type: object
+      properties:
+        positive:
+          type: integer
+          description: Number of positive comments
+          example: 45
+        neutral:
+          type: integer
+          description: Number of neutral comments
+          example: 30
+        critical:
+          type: integer
+          description: Number of critical comments
+          example: 20
+        toxic:
+          type: integer
+          description: Number of toxic comments
+          example: 5
+
+    SentimentSummaries:
+      type: object
+      properties:
+        positive:
+          type: string
+          description: Summary of positive comments
+          example: "Users loved the content and found it very helpful..."
+        neutral:
+          type: string
+          description: Summary of neutral comments
+          example: "Mixed reactions about the topic..."
+        critical:
+          type: string
+          description: Summary of critical comments
+          example: "Some concerns raised about the approach..."
+        toxic:
+          type: string
+          description: High-level overview of toxic comments without direct quotes
+          example: "Some inappropriate language and personal attacks were detected"
+
+    AnalysisResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Video analysis completed successfully"
+        analysis_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        video_title:
+          type: string
+          example: "Amazing Video Title"
+        channel_name:
+          type: string
+          example: "Cool Channel"
+        sentiment_summary:
+          $ref: '#/components/schemas/SentimentSummary'
+        overall_sentiment_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Overall sentiment score (0-1)
+          example: 0.65
+        summaries:
+          $ref: '#/components/schemas/SentimentSummaries'
+
+    Analysis:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        video_title:
+          type: string
+          example: "Amazing Video Title"
+        channel_name:
+          type: string
+          example: "Cool Channel"
+        youtube_video_id:
+          type: string
+          example: "dQw4w9WgXcQ"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        sentiment_summary:
+          $ref: '#/components/schemas/SentimentSummary'
+        overall_sentiment_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.65
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 25
+        pages:
+          type: integer
+          example: 3
+
+    AnalysisHistoryResponse:
+      type: object
+      properties:
+        analyses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Analysis'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CommentsByDate:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2024-01-15"
+        count:
+          type: integer
+          example: 25
+        sentiment_breakdown:
+          $ref: '#/components/schemas/SentimentSummary'
+
+    AnalysisDetailsResponse:
+      allOf:
+        - $ref: '#/components/schemas/Analysis'
+        - type: object
+          properties:
+            summaries:
+              $ref: '#/components/schemas/SentimentSummaries'
+            commentsByDate:
+              type: array
+              items:
+                $ref: '#/components/schemas/CommentsByDate'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        full_name:
+          type: string
+          example: "John Doe"
+        role:
+          type: string
+          enum: [user, admin, super_admin]
+          example: "user"
+        status:
+          type: string
+          enum: [active, suspended, banned]
+          example: "active"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        last_sign_in_at:
+          type: string
+          format: date-time
+          example: "2024-01-20T14:22:00Z"
+
+    UsersResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    UpdateUserRoleRequest:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          enum: [user, admin, super_admin]
+          example: "admin"
+
+    UpdateUserStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [active, suspended, banned]
+          example: "suspended"
+        reason:
+          type: string
+          description: Reason for status change
+          example: "Policy violation"
+
+    UpdateUserResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "User updated successfully"
+        user:
+          $ref: '#/components/schemas/User'
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        message:
+          type: string
+          example: "TubeInsight API is running!"
+        services:
+          type: object
+          properties:
+            supabase:
+              type: string
+              example: "OK"
+            openai:
+              type: string
+              example: "OK"
+            youtube:
+              type: string
+              example: "OK"
+
+    SystemHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-20T15:30:00Z"
+        database:
+          type: object
+          properties:
+            status:
+              type: string
+              example: "connected"
+            tables:
+              type: object
+              properties:
+                analyses:
+                  type: integer
+                  example: 1250
+                comments:
+                  type: integer
+                  example: 125000
+                videos:
+                  type: integer
+                  example: 800
+        api_usage:
+          type: object
+          properties:
+            last_24h:
+              type: object
+              properties:
+                youtube:
+                  type: integer
+                  example: 45
+                openai:
+                  type: integer
+                  example: 32
+            last_7d:
+              type: object
+              properties:
+                youtube:
+                  type: integer
+                  example: 320
+                openai:
+                  type: integer
+                  example: 280
+        users:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 150
+            active:
+              type: integer
+              example: 145
+            suspended:
+              type: integer
+              example: 3
+            banned:
+              type: integer
+              example: 2
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request parameters"
+        code:
+          type: string
+          description: Error code
+          example: "invalid_parameters"
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid request parameters"
+            code: "invalid_parameters"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Authentication required"
+            code: "unauthorized"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Insufficient permissions"
+            code: "forbidden"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Resource not found"
+            code: "not_found"
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Rate limit exceeded"
+            code: "rate_limit_exceeded"
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error"
+            code: "server_error"
+
+tags:
+  - name: Video Analysis
+    description: Endpoints for analyzing YouTube videos and retrieving analysis results
+  - name: Admin
+    description: Administrative endpoints for user and system management
+  - name: Utility
+    description: Utility endpoints for health checks and system status
