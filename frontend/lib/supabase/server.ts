@@ -5,7 +5,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers'; // Import cookies from next/headers for App Router
 
-export function createSupabaseServerClient() {
+export function createClient() {
   // Get the cookie store from next/headers
   const cookieStore = cookies();
 
